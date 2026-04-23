@@ -1,0 +1,59 @@
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.23
+alembic==1.12.1
+psycopg2-binary==2.9.9
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-decouple==3.8
+
+# Validation & Serialization
+pydantic==2.5.0
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# File Handling
+aiofiles==23.2.1
+
+# AI & ML Stack (Free Tier Optimized)
+# Text Summarization - Groq (Llama 3.1 8B)
+groq==0.9.0
+
+# Speech-to-Text - Whisper
+openai-whisper==20231117
+# Audio processing for speech
+librosa==0.10.1
+soundfile==0.12.1
+numpy==1.24.3
+
+# Document OCR & PDF Processing
+# Digital PDFs
+pdfplumber==0.10.3
+pymupdf==1.23.18
+# Scanned documents & images
+pytesseract==0.3.10
+Pillow==10.1.0
+# Image preprocessing
+opencv-python==4.8.1.78
+
+# Text processing & cleanup
+nltk==3.8.1
+spacy==3.7.2
+
+# Development & Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
