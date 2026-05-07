@@ -10,6 +10,9 @@ class PatientBase(BaseModel):
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    medical_history: Optional[str] = None
     allergies: Optional[str] = None
     medications: Optional[str] = None
     chronic_conditions: Optional[str] = None
@@ -25,6 +28,9 @@ class PatientUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    medical_history: Optional[str] = None
     allergies: Optional[str] = None
     medications: Optional[str] = None
     chronic_conditions: Optional[str] = None

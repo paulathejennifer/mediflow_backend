@@ -45,6 +45,15 @@ class Priority(str, Enum):
     HIGH = "high"
     EMERGENCY = "emergency"
 
+class ReferralReason(str, Enum):
+    EMERGENCY_CARE = "emergency_care"
+    SPECIALIST_CONSULTATION = "specialist_consultation"
+    DIAGNOSTIC_PROCEDURE = "diagnostic_procedure"
+    SURGERY = "surgery"
+    SECOND_OPINION = "second_opinion"
+    FOLLOW_UP_CARE = "follow_up_care"
+    UNKNOWN = "unknown"
+
 # Documents
 class DocumentType(str, Enum):
     LAB_REPORT = "lab_report"

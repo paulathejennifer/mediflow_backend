@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import auth, users, facilities, patients, referrals, documents, voice_notes, ai
+from app.api.v1 import websocket, notifications
 
 api_router = APIRouter()
 
@@ -11,3 +12,5 @@ api_router.include_router(referrals.router, prefix="/referrals", tags=["referral
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 api_router.include_router(voice_notes.router, prefix="/voice-notes", tags=["voice-notes"])
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
+api_router.include_router(websocket.router, prefix="/websocket", tags=["websocket"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])

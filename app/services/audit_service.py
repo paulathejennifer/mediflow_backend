@@ -15,6 +15,49 @@ from app.models.user import User
 from app.enums import AuditAction
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
+
+def create_audit_logger(db: Session) -> logging.LoggerAdapter:
+    """
+    Create a logger adapter for audit logging.
+    
+    Args:
+        db: Database session
+        
+    Returns:
+        Logger adapter with audit context
+    """
+    class AuditLoggerAdapter(logging.LoggerAdapter):
+        def process(self, msg, kwargs):
+            # Add audit context to log messages
+            audit_context = kwargs.pop('audit_context', {})
+            if audit_context:
+                msg = f"[AUDIT] {msg} | Context: {audit_context}"
+            return msg, kwargs
+        
+        def log_action(self, user_id: int, action: str, entity_type: str, 
+                     entity_id: Optional[int] = None, details: Optional[Dict[str, Any]] = None,
+                     ip_address: Optional[str] = None, user_agent: Optional[str] = None):
+            """Log audit action directly through logger."""
+            audit_service = AuditService(db)
+            audit_service.log_action(
+                user_id=user_id,
+                action=action,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                details=details,
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+    
+    # Create base logger
+    audit_logger = logging.getLogger('mediflow.audit')
+    audit_logger.setLevel(logging.INFO)
+    
+    # Create adapter
+    return AuditLoggerAdapter(audit_logger, {})
 
 class AuditService:
     """Service for audit and compliance operations."""
