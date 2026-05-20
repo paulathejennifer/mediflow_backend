@@ -7,15 +7,23 @@ from app.models.referral import Referral
 from app.models.referral_document import ReferralDocument
 from app.models.voice_note import VoiceNote
 from app.models.audit_log import AuditLog
+from app.models.password_reset_token import PasswordResetToken
+from app.models.email_verification_token import EmailVerificationToken
+from app.models.notifications import Notification
+from app.models.refresh_token import RefreshToken
 
 __all__ = [
     "User",
-    "Facility", 
+    "Facility",
     "Patient",
     "PatientIdentifier",
     "FacilityCounter",
     "Referral",
     "ReferralDocument",
     "VoiceNote",
-    "AuditLog"
+    "AuditLog",
+    "PasswordResetToken",
+    "EmailVerificationToken",
+    "Notification",
+    "RefreshToken"
 ]

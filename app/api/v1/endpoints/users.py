@@ -199,24 +199,24 @@ def deactivate_user(
     """Deactivate user account."""
     permission_checker = get_permission_checker(current_user, db)
     permission_checker.check_user_management(target_user_id=user_id)
-    
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
+
     # Cannot deactivate self
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot deactivate your own account"
         )
-    
+
     try:
         auth_service.deactivate_user(user_id)
-        
+
         # Log deactivation
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
@@ -230,15 +230,70 @@ def deactivate_user(
                 "role": user.role
             }
         )
-        
+
         return {"message": "User deactivated successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to deactivate user: {str(e)}"
+        )
+
+@router.delete("/{user_id}/hard")
+def hard_delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Permanently delete user account (Super Admin only)."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can permanently delete users"
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Cannot delete self
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account"
+        )
+
+    try:
+        # Delete associated audit logs first (they have NOT NULL constraint on user_id)
+        from app.models.audit_log import AuditLog
+        db.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
+
+        # Delete other related records
+        from app.models.refresh_token import RefreshToken
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
+
+        from app.models.password_reset_token import PasswordResetToken
+        db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user_id).delete()
+
+        from app.models.email_verification_token import EmailVerificationToken
+        db.query(EmailVerificationToken).filter(EmailVerificationToken.user_id == user_id).delete()
+
+        # Delete the user
+        db.delete(user)
+        db.commit()
+
+        return {"message": "User permanently deleted"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete user: {str(e)}"
         )
 
 @router.post("/{user_id}/activate")

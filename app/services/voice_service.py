@@ -18,6 +18,7 @@ from app.utils.file_utils import AudioHandler
 from app.enums import VoiceStatus
 from typing import List, Optional, Dict, Any
 import os
+import speech_recognition as sr
 
 class VoiceService:
     """Service for voice note management operations."""
@@ -424,24 +425,35 @@ class VoiceService:
             print(f"Transcription failed for voice note {voice_note_id}: {str(e)}")
 
     def _transcribe_audio(self, voice_note: VoiceNote) -> str:
-        """Transcribe audio file (mock implementation)."""
-        # In production, this would use OpenAI Whisper or similar service
-        # For now, return a mock transcript
-        
-        mock_transcripts = [
-            "Patient is presenting with chest pain and shortness of breath. Symptoms started approximately 2 hours ago. Pain is described as pressure-like, 8 out of 10 in severity. Patient also reports some nausea and sweating. No previous history of cardiac issues. Patient takes amlodipine for hypertension but admits to missing doses recently.",
+        """Transcribe audio file using Google Speech Recognition."""
+        try:
+            # Initialize recognizer
+            recognizer = sr.Recognizer()
             
-            "45-year-old male patient complaining of severe headache for the past 24 hours. Pain is unilateral, throbbing in nature, associated with photophobia and nausea. No history of similar headaches. Patient denies any trauma. Vital signs show elevated blood pressure at 160/95. No neurological deficits noted on examination.",
+            # Check if audio file exists
+            if not os.path.exists(voice_note.audio_path):
+                print(f"Audio file not found: {voice_note.audio_path}")
+                return ""
             
-            "Patient presents with right lower quadrant abdominal pain for 12 hours. Pain is sharp, constant, 6/10 severity. Associated with loss of appetite and low-grade fever. Patient has had similar episodes before but never this severe. Abdomen is tender in RLQ with positive rebound tenderness."
-        ]
-        
-        # Return a mock transcript based on file name (for consistency)
-        import hashlib
-        hash_value = int(hashlib.md5(voice_note.audio_file_name.encode()).hexdigest(), 16)
-        transcript_index = hash_value % len(mock_transcripts)
-        
-        return mock_transcripts[transcript_index]
+            # Use the audio file
+            with sr.AudioFile(voice_note.audio_path) as source:
+                # Read the audio data
+                audio_data = recognizer.record(source)
+                
+                # Recognize speech using Google's free web API
+                try:
+                    transcript = recognizer.recognize_google(audio_data)
+                    return transcript
+                except sr.UnknownValueError:
+                    print(f"Google Speech Recognition could not understand audio for {voice_note.audio_file_name}")
+                    return ""
+                except sr.RequestError as e:
+                    print(f"Could not request results from Google Speech Recognition service; {e}")
+                    return ""
+                    
+        except Exception as e:
+            print(f"Error transcribing audio: {str(e)}")
+            return ""
 
     def _trigger_transcript_cleanup(self, voice_note_id: int, raw_transcript: str) -> None:
         """Trigger AI cleanup of transcript (async)."""

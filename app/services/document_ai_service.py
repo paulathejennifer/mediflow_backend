@@ -11,6 +11,7 @@ import asyncio
 import os
 import tempfile
 import logging
+import io
 from typing import Dict, Any, Optional, List, Tuple
 import pdfplumber
 import fitz  # PyMuPDF
@@ -618,6 +619,3 @@ Chest pain with possible cardiac etiology. Recommend cardiac workup and continue
 
 # Global instance
 document_ai_service = DocumentAIService()
-
-# Add missing import
-import io

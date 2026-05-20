@@ -27,32 +27,108 @@ class FacilityService:
 
     def create_facility(self, facility_data: FacilityCreate, creator_id: int) -> Facility:
         """
-        Create a new facility with validation.
-        
+        Create a new facility with validation and automatic code generation.
+
         Args:
             facility_data: Facility creation data
             creator_id: ID of user creating this facility
-            
+
         Returns:
             Created facility object
         """
-        # Check if facility code already exists
-        existing_facility = self.db.query(Facility).filter(
-            Facility.facility_code == facility_data.facility_code
-        ).first()
-        if existing_facility:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Facility code already exists"
-            )
-        
-        # Create facility
-        facility = Facility(**facility_data.dict())
+        # Generate or validate facility code
+        facility_code = facility_data.facility_code
+
+        if not facility_code or (isinstance(facility_code, str) and facility_code.strip() == ""):
+            # Auto-generate code from facility name
+            try:
+                facility_code = self._generate_facility_code(facility_data.name)
+            except Exception as e:
+                # If generation fails, use a fallback
+                facility_code = "FAC" + str(hash(facility_data.name))[:3].upper()
+        else:
+            # Validate uniqueness if code is provided
+            existing_facility = self.db.query(Facility).filter(
+                Facility.facility_code == facility_code
+            ).first()
+            if existing_facility:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Facility code already exists"
+                )
+
+        # Ensure facility_code is never None (database constraint)
+        if not facility_code:
+            try:
+                facility_code = self._generate_facility_code(facility_data.name)
+            except Exception as e:
+                # Fallback if generation fails
+                facility_code = "FAC" + str(hash(facility_data.name))[:3].upper()
+
+        # Create facility with generated/validated code
+        # Build dict manually to ensure facility_code is set
+        facility = Facility(
+            name=facility_data.name,
+            facility_code=facility_code,
+            type=facility_data.type,
+            level=facility_data.level,
+            county=facility_data.county,
+            address=facility_data.address,
+            phone=facility_data.phone,
+            email=facility_data.email,
+            is_active=facility_data.is_active
+        )
         self.db.add(facility)
         self.db.commit()
         self.db.refresh(facility)
-        
+
         return facility
+    
+    def _generate_facility_code(self, facility_name: str) -> str:
+        """
+        Generate a facility code from the facility name with duplicate handling.
+        
+        Args:
+            facility_name: Name of the facility
+            
+        Returns:
+            Generated facility code
+        """
+        # Extract initials from facility name (first letter of each word)
+        words = facility_name.strip().split()
+        if not words:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Facility name is required for code generation"
+            )
+        
+        # Generate base code (uppercase initials)
+        base_code = "".join([word[0].upper() for word in words if word])
+        
+        # Ensure code is at least 2 characters
+        if len(base_code) < 2:
+            base_code = (base_code + facility_name[:2]).upper()
+        
+        # Check if base code exists
+        existing = self.db.query(Facility).filter(
+            Facility.facility_code == base_code
+        ).first()
+        
+        if not existing:
+            return base_code
+        
+        # Handle duplicates with suffixes
+        suffix = 1
+        while True:
+            new_code = f"{base_code}-{suffix:02d}"
+            existing = self.db.query(Facility).filter(
+                Facility.facility_code == new_code
+            ).first()
+            
+            if not existing:
+                return new_code
+            
+            suffix += 1
 
     def get_facility_by_id(self, facility_id: int) -> Optional[Facility]:
         """Get facility by ID."""

@@ -9,6 +9,7 @@ from app.schemas.facility import FacilityCreate, FacilityUpdate, FacilityRespons
 from app.models.facility import Facility
 from app.models.user import User
 from app.enums import UserRole, AuditAction
+from app.services.facility_service import FacilityService
 
 router = APIRouter()
 
@@ -26,21 +27,11 @@ def create_facility(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only Super Admin can create facilities"
         )
-    
-    # Check if facility code already exists
-    existing_facility = db.query(Facility).filter(Facility.facility_code == facility_data.facility_code).first()
-    if existing_facility:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Facility code already exists"
-        )
-    
+
     try:
-        facility = Facility(**facility_data.dict())
-        db.add(facility)
-        db.commit()
-        db.refresh(facility)
-        
+        facility_service = FacilityService(db)
+        facility = facility_service.create_facility(facility_data, current_user.id)
+
         # Log creation
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
@@ -50,8 +41,10 @@ def create_facility(
             entity_id=facility.id,
             details={"name": facility.name, "code": facility.facility_code}
         )
-        
+
         return facility
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(

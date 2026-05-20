@@ -11,6 +11,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends, H
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.websocket.manager import connection_manager, authenticate_websocket
 from app.services.notification_service import get_notification_service
 from app.models.user import User
@@ -313,21 +314,3 @@ async def create_test_notification(
         "message": "Test notification created",
         "notification_id": notification.id
     }
-
-
-# Helper function to get current user (would need to be implemented)
-async def get_current_user(token: str = None, db: Session = None) -> User:
-    """
-    Get current authenticated user from token
-    This is a placeholder - would need to implement actual JWT verification
-    """
-    # This would typically verify the JWT token and return the user
-    # For now, return a dummy user
-    return User(id=1, email="test@example.com", role="clinician")
-
-
-# Import for dependency injection
-from app.core.security import get_current_user as auth_get_current_user
-
-# Override the placeholder with actual auth
-get_current_user = auth_get_current_user

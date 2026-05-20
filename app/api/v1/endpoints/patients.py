@@ -53,7 +53,10 @@ def create_patient(
             current_user.facility_id,
             facility.facility_code
         )
-        
+
+        # Refresh identifier to load facility relationship
+        db.refresh(identifier)
+
         # Log creation
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
@@ -67,7 +70,11 @@ def create_patient(
                 "facility_id": current_user.facility_id
             }
         )
-        
+
+        # Add facility info to identifier for response
+        identifier.facility_name = facility.name
+        identifier.facility_code = facility.facility_code
+
         # Return patient with identifiers
         patient.identifiers = [identifier]
         return patient
@@ -91,12 +98,20 @@ def list_patients(
 ):
     """List patients accessible to the current user."""
     permission_checker = get_permission_checker(current_user, db)
-    
+
+    # Get facility
+    facility = db.query(Facility).filter(Facility.id == current_user.facility_id).first()
+    if not facility:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Facility not found"
+        )
+
     # Base query - get patients from user's facility
     query = db.query(Patient).join(PatientIdentifier).filter(
         PatientIdentifier.facility_id == current_user.facility_id
     )
-    
+
     # Apply search filter
     if search:
         search_term = f"%{search}%"
@@ -105,9 +120,9 @@ def list_patients(
             (Patient.last_name.ilike(search_term)) |
             (Patient.phone.ilike(search_term))
         )
-    
+
     patients = query.offset(skip).limit(limit).all()
-    
+
     # Load identifiers for each patient
     result = []
     for patient in patients:
@@ -116,10 +131,15 @@ def list_patients(
             PatientIdentifier.patient_id == patient.id,
             PatientIdentifier.facility_id == current_user.facility_id
         ).all()
-        
+
+        # Populate facility info for each identifier
+        for identifier in identifiers:
+            identifier.facility_name = facility.name
+            identifier.facility_code = facility.facility_code
+
         patient.identifiers = identifiers
         result.append(patient)
-    
+
     return result
 
 @router.get("/{patient_id}", response_model=PatientWithIdentifiers)
@@ -177,12 +197,19 @@ def update_patient(
         
         # Log update
         audit_logger = create_audit_logger(db)
+        # Convert date objects to strings for JSON serialization
+        audit_details = {}
+        for key, value in update_data.items():
+            if hasattr(value, 'isoformat'):
+                audit_details[key] = value.isoformat()
+            else:
+                audit_details[key] = value
         audit_logger.log_action(
             user_id=current_user.id,
             action=AuditAction.UPDATE,
             entity_type="patient",
             entity_id=patient.id,
-            details=update_data
+            details=audit_details
         )
         
         # Get identifiers

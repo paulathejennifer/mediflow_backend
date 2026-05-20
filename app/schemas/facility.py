@@ -4,7 +4,7 @@ from datetime import datetime
 
 class FacilityBase(BaseModel):
     name: str
-    facility_code: str
+    facility_code: Optional[str] = None
     type: str
     level: str
     county: str

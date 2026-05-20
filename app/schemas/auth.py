@@ -7,6 +7,7 @@ class UserLogin(BaseModel):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
 
 class TokenData(BaseModel):
@@ -35,3 +36,23 @@ class UserResponse(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+class VerifyCodeRequest(BaseModel):
+    code: str
+    email: Optional[EmailStr] = None
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

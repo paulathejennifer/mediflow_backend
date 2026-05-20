@@ -17,6 +17,7 @@ from email import encoders
 from typing import Optional, Dict, Any
 import logging
 from datetime import datetime
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +25,16 @@ class EmailService:
     """Service for sending emails via SMTP."""
     
     def __init__(self):
-        self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-        self.smtp_port = int(os.getenv("SMTP_PORT", 587))
-        self.smtp_username = os.getenv("SMTP_USERNAME")
-        self.smtp_password = os.getenv("SMTP_PASSWORD")
-        self.from_email = os.getenv("FROM_EMAIL", "noreply@mediflow.com")
-        self.from_name = os.getenv("FROM_NAME", "MediFlow Team")
+        self.smtp_server = settings.SMTP_HOST
+        self.smtp_port = settings.SMTP_PORT
+        self.smtp_username = settings.SMTP_USER
+        self.smtp_password = settings.SMTP_PASSWORD
+        self.from_email = settings.SMTP_FROM_EMAIL
+        self.from_name = settings.SMTP_FROM_NAME
+        self.use_tls = settings.SMTP_USE_TLS
         
         # Validate configuration
-        if not all([self.smtp_username, self.smtp_password]):
+        if not all([self.smtp_username, self.smtp_password, self.from_email]):
             logger.warning("Email service not fully configured - using demo mode")
             self.demo_mode = True
         else:
@@ -41,16 +43,16 @@ class EmailService:
     async def send_password_reset(self, email: str, token: str, user_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Send password reset email.
-        
+
         Args:
             email: Recipient email address
             token: Password reset token
             user_name: Optional user's first name
-            
+
         Returns:
             Dict with email delivery status
         """
-        reset_link = f"https://app.mediflow.com/reset-password?token={token}"
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
         
         # Personalize greeting
         greeting = f"Hello {user_name}," if user_name else "Hello,"
@@ -515,7 +517,8 @@ class EmailService:
             
             # Send email
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
+                if self.use_tls:
+                    server.starttls()
                 server.login(self.smtp_username, self.smtp_password)
                 server.send_message(msg)
             

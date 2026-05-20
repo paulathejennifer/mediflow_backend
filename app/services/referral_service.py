@@ -369,6 +369,7 @@ class ReferralService:
                         "file_name": doc.file_name,
                         "file_type": doc.file_type,
                         "file_size": doc.file_size,
+                        "extracted_text": doc.extracted_text,
                         "created_at": doc.created_at
                     }
                     for doc in documents
@@ -379,6 +380,8 @@ class ReferralService:
                         "audio_file_name": vn.audio_file_name,
                         "duration_seconds": vn.duration_seconds,
                         "status": vn.status,
+                        "transcript": vn.transcript,
+                        "processed_transcript": vn.processed_transcript,
                         "created_at": vn.created_at
                     }
                     for vn in voice_notes
@@ -541,25 +544,38 @@ class ReferralService:
         return today.year - date_of_birth.year - ((today.month, today.day) < (date_of_birth.month, date_of_birth.day))
 
     def _summarize_documents(self, documents: List[Dict]) -> str:
-        """Summarize attached documents."""
+        """Summarize attached documents with extracted text."""
         if not documents:
             return "No documents attached"
-        
+
         summary = []
         for doc in documents:
-            summary.append(f"- {doc['file_name']} ({doc['file_type']})")
-        
+            text = doc.get('extracted_text', '')
+            if text:
+                # Truncate long text to avoid overwhelming the AI
+                truncated = text[:1000] + "..." if len(text) > 1000 else text
+                summary.append(f"- {doc['file_name']} ({doc['file_type']}): {truncated}")
+            else:
+                summary.append(f"- {doc['file_name']} ({doc['file_type']}): Not transcribed")
+
         return "\n".join(summary)
 
     def _summarize_voice_notes(self, voice_notes: List[Dict]) -> str:
-        """Summarize voice notes."""
+        """Summarize voice notes with transcripts."""
         if not voice_notes:
             return "No voice notes"
-        
+
         summary = []
         for vn in voice_notes:
-            summary.append(f"- {vn['audio_file_name']} ({vn.get('duration_seconds', 'Unknown duration')}s)")
-        
+            # Use processed transcript if available, otherwise use raw transcript
+            transcript = vn.get('processed_transcript') or vn.get('transcript', '')
+            if transcript:
+                # Truncate long transcripts to avoid overwhelming the AI
+                truncated = transcript[:1000] + "..." if len(transcript) > 1000 else transcript
+                summary.append(f"- {vn['audio_file_name']}: {truncated}")
+            else:
+                summary.append(f"- {vn['audio_file_name']}: Not transcribed")
+
         return "\n".join(summary)
 
 def get_referral_service(db: Session) -> ReferralService:

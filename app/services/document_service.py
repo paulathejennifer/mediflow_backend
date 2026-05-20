@@ -14,10 +14,12 @@ from fastapi import HTTPException, status, UploadFile
 from app.models.referral_document import ReferralDocument
 from app.models.referral import Referral
 from app.services.ai_service import AIService
+from app.services.document_ai_service import DocumentAIService
 from app.utils.file_utils import DocumentHandler
 from app.enums import DocumentType
 from typing import List, Optional, Dict, Any
 import os
+import asyncio
 
 class DocumentService:
     """Service for document management operations."""
@@ -72,7 +74,7 @@ class DocumentService:
             self.db.refresh(document)
             
             # Trigger AI processing for text extraction
-            self._trigger_text_extraction(document.id)
+            await self._trigger_text_extraction(document.id)
             
             return document
             
@@ -369,15 +371,15 @@ class DocumentService:
             "avg_file_size_kb": round((total_size / max(total_documents, 1)) / 1024, 2)
         }
 
-    def _trigger_text_extraction(self, document_id: int) -> None:
+    async def _trigger_text_extraction(self, document_id: int) -> None:
         """Trigger AI text extraction for document (async)."""
         try:
             document = self.get_document_by_id(document_id)
             if not document:
                 return
             
-            # Simple text extraction based on file type
-            extracted_text = self._extract_text_from_file(document)
+            # Extract text using Document AI Service
+            extracted_text = await self._extract_text_from_file(document)
             
             if extracted_text:
                 # Update document with extracted text
@@ -389,30 +391,20 @@ class DocumentService:
         except Exception as e:
             print(f"Text extraction failed for document {document_id}: {str(e)}")
 
-    def _extract_text_from_file(self, document: ReferralDocument) -> str:
-        """Extract text from document file."""
-        # This is a simplified implementation
-        # In production, use proper OCR for images and PDF text extraction
-        
+    async def _extract_text_from_file(self, document: ReferralDocument) -> str:
+        """Extract text from document file using DocumentAIService."""
         try:
-            if document.mime_type == "text/plain":
-                # Extract from text file
-                with open(document.file_path, 'r', encoding='utf-8') as f:
-                    return f.read()
+            # Initialize Document AI Service
+            doc_ai_service = DocumentAIService()
             
-            elif document.mime_type == "application/pdf":
-                # Use PDF library to extract text (simplified)
-                # In production, use PyPDF2 or pdfplumber
-                return f"[PDF content from {document.file_name}]"
+            # Extract text using the AI service
+            extraction_result = await doc_ai_service.extract_text_from_document(document.file_path)
             
-            elif document.mime_type.startswith("image/"):
-                # OCR would be needed here (simplified)
-                return f"[OCR text from image {document.file_name}]"
-            
-            else:
-                return f"[Unsupported file type for text extraction: {document.mime_type}]"
+            # Return the extracted text
+            return extraction_result.get("text", "")
                 
         except Exception as e:
+            print(f"Text extraction failed: {str(e)}")
             return f"[Text extraction failed: {str(e)}]"
 
     def _trigger_medical_analysis(self, document_id: int, text: str) -> None:

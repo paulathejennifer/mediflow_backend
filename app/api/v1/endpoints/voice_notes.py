@@ -15,7 +15,7 @@ from app.enums import UserRole, AuditAction, VoiceStatus
 router = APIRouter()
 
 @router.post("/upload", response_model=VoiceNoteResponse)
-def upload_voice_note(
+async def upload_voice_note(
     referral_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -39,6 +39,8 @@ def upload_voice_note(
         audio_metadata = await audio_handler.handle_upload(file, referral_id, current_user.id)
         
         # Create voice note record
+        # Remove mime_type from metadata as VoiceNote model doesn't have this field
+        audio_metadata.pop('mime_type', None)
         voice_note = VoiceNote(
             referral_id=referral_id,
             uploaded_by=current_user.id,
@@ -84,11 +86,11 @@ def list_referral_voice_notes(
     """List voice notes for a referral."""
     permission_checker = get_permission_checker(current_user, db)
     permission_checker.check_referral_access(referral_id)
-    
+
     voice_notes = db.query(VoiceNote).filter(
         VoiceNote.referral_id == referral_id
     ).order_by(VoiceNote.created_at.desc()).all()
-    
+
     # Create summaries with uploader names
     result = []
     for vn in voice_notes:
@@ -102,7 +104,49 @@ def list_referral_voice_notes(
             uploader_name=f"{uploader.first_name} {uploader.last_name}" if uploader else "Unknown"
         )
         result.append(summary)
-    
+
+    return result
+
+@router.get("/facility", response_model=List[VoiceNoteSummary])
+def list_facility_voice_notes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """List all voice notes for the user's facility."""
+    if not current_user.facility_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is not associated with a facility"
+        )
+
+    # Get all referrals for this facility (both from and to)
+    from app.models.referral import Referral
+    referrals = db.query(Referral).filter(
+        (Referral.from_facility_id == current_user.facility_id) |
+        (Referral.to_facility_id == current_user.facility_id)
+    ).all()
+
+    referral_ids = [r.id for r in referrals]
+
+    # Get all voice notes for these referrals
+    voice_notes = db.query(VoiceNote).filter(
+        VoiceNote.referral_id.in_(referral_ids)
+    ).order_by(VoiceNote.created_at.desc()).all()
+
+    # Create summaries with uploader names
+    result = []
+    for vn in voice_notes:
+        uploader = db.query(User).filter(User.id == vn.uploaded_by).first()
+        summary = VoiceNoteSummary(
+            id=vn.id,
+            audio_file_name=vn.audio_file_name,
+            duration_seconds=vn.duration_seconds,
+            status=vn.status,
+            created_at=vn.created_at,
+            uploader_name=f"{uploader.first_name} {uploader.last_name}" if uploader else "Unknown"
+        )
+        result.append(summary)
+
     return result
 
 @router.get("/{voice_note_id}", response_model=VoiceNoteResponse)
@@ -172,6 +216,131 @@ def update_voice_note(
             detail=f"Failed to update voice note: {str(e)}"
         )
 
+@router.post("/{voice_note_id}/transcribe")
+async def transcribe_voice_note(
+    voice_note_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Transcribe a voice note using Whisper."""
+    voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).first()
+    if not voice_note:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Voice note not found"
+        )
+
+    # Check referral access
+    permission_checker = get_permission_checker(current_user, db)
+    permission_checker.check_referral_access(voice_note.referral_id)
+
+    try:
+        from app.services.speech_ai_service import speech_ai_service
+
+        # Transcribe audio
+        transcription_result = await speech_ai_service.transcribe_audio(voice_note.audio_path)
+
+        # Update voice note with transcript
+        voice_note.transcript = transcription_result.get("transcript", "")
+        voice_note.duration_seconds = transcription_result.get("duration_seconds")
+        voice_note.status = VoiceStatus.TRANSCRIBED
+        db.commit()
+        db.refresh(voice_note)
+
+        # Log transcription
+        audit_logger = create_audit_logger(db)
+        audit_logger.log_action(
+            user_id=current_user.id,
+            action=AuditAction.UPDATE,
+            entity_type="voice_note",
+            entity_id=voice_note.id,
+            details={
+                "action": "transcribe",
+                "duration_seconds": voice_note.duration_seconds,
+                "word_count": transcription_result.get("word_count", 0),
+                "confidence": transcription_result.get("confidence")
+            }
+        )
+
+        return {
+            "voice_note_id": voice_note.id,
+            "transcript": voice_note.transcript,
+            "duration_seconds": voice_note.duration_seconds,
+            "word_count": transcription_result.get("word_count", 0),
+            "confidence": transcription_result.get("confidence")
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to transcribe voice note: {str(e)}"
+        )
+
+@router.post("/{voice_note_id}/summarize")
+async def summarize_voice_note(
+    voice_note_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate AI summary for a voice note transcript."""
+    voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).first()
+    if not voice_note:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Voice note not found"
+        )
+
+    # Check referral access
+    permission_checker = get_permission_checker(current_user, db)
+    permission_checker.check_referral_access(voice_note.referral_id)
+
+    if not voice_note.transcript:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Voice note must be transcribed before summarization"
+        )
+
+    try:
+        from app.services.ai_service import AIService
+        from app.models.referral import Referral
+        from app.models.patient import Patient
+
+        # Get referral and patient context
+        referral = db.query(Referral).filter(Referral.id == voice_note.referral_id).first()
+        patient = db.query(Patient).filter(Patient.id == referral.patient_id).first() if referral else None
+
+        ai_service = AIService(db)
+
+        # Build context for AI
+        context = {
+            "raw_transcript": voice_note.transcript,
+            "patient_name": f"{patient.first_name} {patient.last_name}" if patient else "Unknown",
+            "referral_reason": referral.reason_for_referral if referral else "Unknown",
+            "specialty": "General"
+        }
+
+        # Clean and summarize transcript
+        cleaned_transcript = ai_service.clean_transcription(context)
+
+        # Update voice note with processed transcript
+        voice_note.processed_transcript = cleaned_transcript
+        voice_note.status = VoiceStatus.PROCESSED
+        db.commit()
+        db.refresh(voice_note)
+
+        return {
+            "voice_note_id": voice_note.id,
+            "processed_transcript": voice_note.processed_transcript,
+            "original_transcript": voice_note.transcript
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to summarize voice note: {str(e)}"
+        )
+
 @router.delete("/{voice_note_id}")
 def delete_voice_note(
     voice_note_id: int,
@@ -185,27 +354,27 @@ def delete_voice_note(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Voice note not found"
         )
-    
+
     # Check permissions - only uploader or admin can delete
     permission_checker = get_permission_checker(current_user, db)
     permission_checker.check_referral_access(voice_note.referral_id)
-    
-    if (voice_note.uploaded_by != current_user.id and 
+
+    if (voice_note.uploaded_by != current_user.id and
         current_user.role not in [UserRole.SUPER_ADMIN, UserRole.FACILITY_ADMIN]):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only voice note uploader or admin can delete voice notes"
         )
-    
+
     try:
         # Delete audio file from disk
         from app.utils.file_utils import FileUtils
         FileUtils.delete_file(voice_note.audio_path)
-        
+
         # Delete database record
         db.delete(voice_note)
         db.commit()
-        
+
         # Log deletion
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
@@ -218,9 +387,9 @@ def delete_voice_note(
                 "referral_id": voice_note.referral_id
             }
         )
-        
+
         return {"message": "Voice note deleted successfully"}
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(

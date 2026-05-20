@@ -136,9 +136,13 @@ class MRNService:
                 phone=patient_data.get("phone"),
                 email=patient_data.get("email"),
                 address=patient_data.get("address"),
+                emergency_contact_name=patient_data.get("emergency_contact_name"),
+                emergency_contact_phone=patient_data.get("emergency_contact_phone"),
+                medical_history=patient_data.get("medical_history"),
                 allergies=patient_data.get("allergies"),
                 medications=patient_data.get("medications"),
-                chronic_conditions=patient_data.get("chronic_conditions")
+                chronic_conditions=patient_data.get("chronic_conditions"),
+                facility_id=facility_id
             )
 
             self.db.add(patient)
@@ -147,7 +151,10 @@ class MRNService:
             # Create patient identifier
             identifier = PatientIdentifier(
                 patient_id=patient.id,
+                identifier_type="MRN",
+                identifier_value=mrn,
                 facility_id=facility_id,
+                is_primary=True,
                 mrn=mrn
             )
 
