@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy and install Python dependencies
 COPY requirements.txt .
+# Upgrade pip/setuptools (openai-whisper needs pkg_resources from setuptools)
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 # Install PyTorch CPU-only first (required by openai-whisper at build time)
 RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
