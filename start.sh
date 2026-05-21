@@ -22,8 +22,12 @@ done
 
 # Run database migrations
 echo "Running database migrations..."
-alembic upgrade head
-echo "Migrations complete."
+if alembic upgrade head; then
+    echo "Migrations complete."
+else
+    echo "WARNING: Migrations failed (non-fatal). The server will still start."
+    echo "  Fix your Alembic migration chain to apply schema changes."
+fi
 
 # Create upload directory if it doesn't exist
 mkdir -p "${UPLOAD_DIR:-uploads}"
