@@ -178,12 +178,78 @@ mediflow_backend/
 │   ├── schemas/             # Pydantic schemas
 │   ├── services/            # Business logic
 │   ├── utils/               # Utility functions
+│   ├── websocket/           # WebSocket connection manager
 │   └── enums.py             # System enums
 ├── alembic/                 # Database migrations
-├── uploads/                 # File storage
-├── requirements.txt         # Dependencies
-└── README.md               # This file
+├── uploads/                 # File storage (gitignored)
+├── Dockerfile               # Production container image
+├── docker-compose.yml       # Local development setup
+├── render.yaml              # Render.com deployment config
+├── gunicorn.conf.py         # Production server config
+├── start.sh                 # Container entrypoint script
+├── requirements.txt         # Python dependencies
+├── .env.example             # Environment variable template
+└── README.md                # This file
 ```
+
+## Deployment
+
+### Option 1: Docker Compose (Local / VPS)
+
+```bash
+# 1. Clone and configure
+git clone https://github.com/paulathejennifer/mediflow_backend.git
+cd mediflow_backend
+cp .env.example .env
+# Edit .env with your values
+
+# 2. Build and run
+docker-compose up --build -d
+
+# 3. Access the API
+# API: http://localhost:8000
+# Docs: http://localhost:8000/docs
+```
+
+### Option 2: Deploy to Render (Recommended)
+
+1. Push this repo to GitHub
+2. Go to [Render Dashboard](https://dashboard.render.com)
+3. Click **New** → **Blueprint**
+4. Connect your GitHub repo
+5. Render auto-detects `render.yaml` and creates:
+   - Web service (Docker) with health checks
+   - PostgreSQL database (free tier)
+   - Persistent disk for file uploads
+6. Add your API keys in the Render dashboard:
+   - `GROQ_API_KEY` — get from [Groq Console](https://console.groq.com/keys)
+   - `SMTP_USERNAME` / `SMTP_PASSWORD` — for email notifications
+
+### Option 3: Docker Only
+
+```bash
+# Build the image
+docker build -t mediflow-backend .
+
+# Run with your own database
+docker run -d \
+  -p 8000:8000 \
+  -e DATABASE_URL=postgresql://user:pass@host:5432/mediflow \
+  -e SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(64))") \
+  -e ENVIRONMENT=production \
+  -v mediflow-uploads:/app/uploads \
+  mediflow-backend
+```
+
+### Production Environment Variables
+
+See [`.env.example`](.env.example) for the full list. Required variables:
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SECRET_KEY` | JWT signing key (auto-generated in dev) |
+| `ENVIRONMENT` | `development` or `production` |
 
 ## Contributing
 

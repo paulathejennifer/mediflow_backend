@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mediflow
+      POSTGRES_PASSWORD: mediflow_dev_password
+      POSTGRES_DB: mediflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MediFlow Backend API
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://mediflow:mediflow_dev_password@db:5432/mediflow
+      SECRET_KEY: dev-secret-key-change-in-production
+      ENVIRONMENT: development
+      WHISPER_MODEL: base
+      TESSERACT_PATH: /usr/bin/tesseract
+      UPLOAD_DIR: /app/uploads
+      ALLOWED_HOSTS: '["http://localhost:3000", "http://localhost:8000"]'
+    volumes:
+      - upload_data:/app/uploads
+      - whisper_cache:/home/appuser/.cache
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  upload_data:
+  whisper_cache:

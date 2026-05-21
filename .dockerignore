@@ -1,0 +1,61 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.eggs
+dist
+build
+venv
+.venv
+.pytest_cache
+.mypy_cache
+htmlcov
+.coverage
+
+# IDE
+.vscode
+.idea
+*.iml
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads (mount as volume instead)
+uploads/
+
+# Documentation
+*.md
+!README.md
+
+# Docker
+docker-compose.yml
+docker-compose.*.yml
+
+# Local dev
+local/
+dev/
+test_data/
+
+# AI model caches (download at runtime)
+models/
+models_cache/
+whisper_models/
+*.pkl
+*.h5
+*.pt
+*.pth
+
+# Logs
+*.log
+logs/
