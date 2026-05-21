@@ -21,19 +21,19 @@ services:
         value: production
       - key: WEB_CONCURRENCY
         value: "1"
-      - key: WHISPER_MODEL
-        value: base
       - key: TESSERACT_PATH
         value: /usr/bin/tesseract
       - key: UPLOAD_DIR
         value: /app/uploads
       - key: ALLOWED_HOSTS
         value: '["*"]'
+      - key: FRONTEND_URL
+        value: "http://localhost:3000"
       - key: GROQ_API_KEY
         sync: false
       - key: OPENAI_API_KEY
         sync: false
-      - key: SMTP_USERNAME
+      - key: SMTP_USER
         sync: false
       - key: SMTP_PASSWORD
         sync: false

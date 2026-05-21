@@ -8,20 +8,16 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies
+# Install build dependencies (portaudio needed for PyAudio/SpeechRecognition)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    portaudio19-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
 COPY requirements.txt .
-# Upgrade pip/setuptools (openai-whisper needs pkg_resources from setuptools)
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
-# Install PyTorch CPU-only first (required by openai-whisper at build time)
-RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-# Install openai-whisper separately with --no-build-isolation (its setup.py needs pkg_resources)
-RUN pip install --no-cache-dir --no-build-isolation openai-whisper==20231117
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir gunicorn
 
@@ -39,6 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsm6 \
     libxext6 \
     libgl1 \
+    libportaudio2 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
