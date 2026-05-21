@@ -281,7 +281,7 @@ async def summarize_document(
         }
 
         # Extract document information
-        summary_result = ai_service.extract_document_info(context)
+        summary_result = await ai_service.extract_document_info(context)
 
         # Store AI summary in a new field or return it
         # Note: ReferralDocument doesn't have an ai_summary field, so we return it

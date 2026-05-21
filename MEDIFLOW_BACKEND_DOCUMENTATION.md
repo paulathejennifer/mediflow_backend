@@ -928,7 +928,29 @@ def client(db):
 
 ---
 
-## 📞 Support & Maintenance
+## � Known Issues & Fixes
+
+### Database Compatibility
+
+#### SQLite vs PostgreSQL Function Differences
+**Issue**: The codebase was initially written for PostgreSQL and used PostgreSQL-specific functions like `NOW()`. When using SQLite as the database, this caused errors.
+
+**Error**: `sqlite3.OperationalError) no such function: NOW`
+
+**Fix Applied (May 2026)**:
+- Replaced all instances of `SELECT NOW()` with `SELECT datetime('now')` in `app/api/v1/endpoints/ai.py`
+- Affected endpoints:
+  - `/api/v1/ai/test-summary` (line 110)
+  - `/api/v1/ai/test-transcription` (line 157)
+  - `/api/v1/ai/test-document-extraction` (line 205)
+  - `/api/v1/ai/referral/{referral_id}/summarize` (line 278)
+  - `/api/v1/ai/health` (line 367)
+
+**Recommendation**: When writing raw SQL queries, use SQLAlchemy's `func.now()` for database-agnostic datetime functions, or explicitly check the database dialect and use appropriate functions.
+
+---
+
+## �📞 Support & Maintenance
 
 ### Monitoring & Logging
 - **Application Logs**: Structured logging with ELK stack

@@ -9,6 +9,7 @@ This module provides API endpoints for AI operations including:
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from app.core.database import get_db
@@ -106,7 +107,7 @@ def test_referral_summary(
             "context": context,
             "ai_summary": summary_result,
             "tested_by": current_user.email,
-            "test_timestamp": str(db.execute("SELECT NOW()").scalar())
+            "test_timestamp": str(db.execute(text("SELECT datetime('now')")).scalar())
         }
         
     except Exception as e:
@@ -153,7 +154,7 @@ def test_transcription_cleanup(
             "context": context,
             "cleaned_transcript": cleanup_result,
             "tested_by": current_user.email,
-            "test_timestamp": str(db.execute("SELECT NOW()").scalar())
+            "test_timestamp": str(db.execute(text("SELECT datetime('now')")).scalar())
         }
         
     except Exception as e:
@@ -201,7 +202,7 @@ def test_document_extraction(
             "context": context,
             "extracted_info": extraction_result,
             "tested_by": current_user.email,
-            "test_timestamp": str(db.execute("SELECT NOW()").scalar())
+            "test_timestamp": str(db.execute(text("SELECT datetime('now')")).scalar())
         }
         
     except Exception as e:
@@ -211,7 +212,7 @@ def test_document_extraction(
         )
 
 @router.post("/referral/{referral_id}/summarize")
-def generate_referral_ai_summary(
+async def generate_referral_ai_summary(
     referral_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -260,9 +261,9 @@ def generate_referral_ai_summary(
             "created_at": referral_summary['referral_info']['created_at'].strftime("%Y-%m-%d %H:%M"),
             "status": referral_summary['referral_info']['status']
         }
-        
+
         # Generate AI summary
-        summary_result = ai_service.generate_referral_summary(context)
+        summary_result = await ai_service.generate_referral_summary(context)
         
         # Update referral with AI summary
         referral.ai_summary = summary_result.get('summary', '')
@@ -274,7 +275,7 @@ def generate_referral_ai_summary(
             "referral_id": referral_id,
             "ai_summary": summary_result,
             "updated_by": current_user.email,
-            "updated_at": str(db.execute("SELECT NOW()").scalar())
+            "updated_at": str(db.execute(text("SELECT datetime('now')")).scalar())
         }
         
     except Exception as e:
@@ -363,7 +364,7 @@ def ai_health_check(
         return {
             "status": "healthy",
             "service": "mediflow-ai",
-            "timestamp": str(db.execute("SELECT NOW()").scalar()),
+            "timestamp": str(db.execute(text("SELECT datetime('now')")).scalar()),
             "mock_mode": not bool(ai_service.api_key)
         }
         

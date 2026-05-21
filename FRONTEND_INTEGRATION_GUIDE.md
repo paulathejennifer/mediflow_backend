@@ -937,67 +937,290 @@ Get voice notes for a referral.
 
 ### Endpoints
 
-#### POST `/ai/referral/{referral_id}/summarize`
-Generate AI-powered referral summary.
+#### POST `/ai/test-summary`
+Test AI referral summary generation (development endpoint).
 
 **Headers:** `Authorization: Bearer <token>`
 
-**Response:**
+**Permissions:** Super Admin, Facility Admin, Clinician only
+
+**Request Body:**
 ```json
 {
-  "summary": "45-year-old male presenting with chest pain and shortness of breath, referred for cardiac evaluation. ECG shows possible abnormal rhythm.",
-  "key_findings": [
-    "Chest pain described as pressure-like, 2/10 severity",
-    "Shortness of breath on minimal exertion",
-    "ECG indicates sinus arrhythmia",
-    "History of hypertension controlled with medication"
-  ],
-  "risks": [
-    "Potential cardiac instability requiring urgent evaluation",
-    "Hypertension as underlying risk factor",
-    "Possible progression to acute cardiac event"
-  ],
-  "missing_info": [
-    "Current vital signs (BP, heart rate, oxygen saturation)",
-    "Cardiac enzymes (troponin, CK-MB)",
-    "Previous ECG comparisons",
-    "Current medication adherence"
-  ],
-  "recommendations": [
-    "Urgent cardiac evaluation within 24 hours",
-    "Complete cardiac workup including enzymes and imaging",
-    "Blood pressure optimization",
-    "Consider stress testing based on evaluation"
-  ],
-  "completeness_score": 60,
-  "urgency_level": "High"
+  "patient_name": "Jane Smith",
+  "age": "45",
+  "gender": "female",
+  "date_of_birth": "1979-03-15",
+  "allergies": "Penicillin, Shellfish",
+  "medications": "Lisinopril 10mg daily, Metformin 500mg twice daily",
+  "chronic_conditions": "Hypertension, Type 2 Diabetes",
+  "reason_for_referral": "Suspected cardiac arrhythmia requiring specialist evaluation",
+  "priority": "high",
+  "from_facility": "Kenyatta National Hospital",
+  "to_facility": "Moi Teaching and Referral Hospital",
+  "clinical_notes": "Patient presents with palpitations, shortness of breath, and chest discomfort. ECG confirms intermittent atrial fibrillation.",
+  "documents_summary": "Lab results show elevated troponin levels. ECG attached.",
+  "voice_transcripts": "No voice notes provided",
+  "created_at": "2024-05-15T10:30:00Z",
+  "status": "submitted"
 }
 ```
 
-#### GET `/ai/status`
-Check AI service status.
+**Response:**
+```json
+{
+  "success": true,
+  "context": {
+    "patient_name": "Jane Smith",
+    "age": "45",
+    "gender": "female",
+    "date_of_birth": "1979-03-15",
+    "allergies": "Penicillin, Shellfish",
+    "medications": "Lisinopril 10mg daily, Metformin 500mg twice daily",
+    "chronic_conditions": "Hypertension, Type 2 Diabetes",
+    "reason_for_referral": "Suspected cardiac arrhythmia requiring specialist evaluation",
+    "priority": "high",
+    "from_facility": "Kenyatta National Hospital",
+    "to_facility": "Moi Teaching and Referral Hospital",
+    "clinical_notes": "Patient presents with palpitations, shortness of breath, and chest discomfort. ECG confirms intermittent atrial fibrillation.",
+    "documents_summary": "Lab results show elevated troponin levels. ECG attached.",
+    "voice_transcripts": "No voice notes provided",
+    "created_at": "2024-05-15T10:30:00Z",
+    "status": "submitted"
+  },
+  "ai_summary": {
+    "summary": "45-year-old female presenting with palpitations, shortness of breath, and chest discomfort. ECG confirms intermittent atrial fibrillation. History of hypertension and type 2 diabetes.",
+    "key_findings": [
+      "Intermittent atrial fibrillation confirmed on ECG",
+      "Hypertension and type 2 diabetes as comorbidities",
+      "Elevated troponin levels on lab results",
+      "Symptoms include palpitations, dyspnea, chest discomfort"
+    ],
+    "risks": [
+      "Potential for thromboembolic events due to AFib",
+      "Cardiac decompensation risk with comorbidities",
+      "Possible acute coronary syndrome given elevated troponin"
+    ],
+    "missing_info": [
+      "Current vital signs (BP, HR, O2 saturation)",
+      "Complete cardiac enzyme panel",
+      "Echocardiogram results",
+      "Current anticoagulation status"
+    ],
+    "recommendations": [
+      "Urgent cardiac evaluation within 24 hours",
+      "Consider anticoagulation therapy assessment",
+      "Complete cardiac workup including echocardiogram",
+      "Optimize blood pressure and glucose control"
+    ],
+    "completeness_score": 65,
+    "urgency_level": "High"
+  },
+  "tested_by": "admin@mediflow.com",
+  "test_timestamp": "2024-05-15 10:30:45"
+}
+```
+
+#### POST `/ai/test-transcription`
+Test AI transcription cleanup (development endpoint).
 
 **Headers:** `Authorization: Bearer <token>`
+
+**Permissions:** Super Admin, Facility Admin, Clinician only
+
+**Request Body:**
+```json
+{
+  "raw_transcript": "um the patient came in with like chest pain and uh shortness of breath they said it feels like pressure um they have a history of hypertension and diabetes",
+  "patient_name": "Jane Smith",
+  "referral_reason": "Suspected cardiac arrhythmia",
+  "specialty": "Cardiology"
+}
+```
 
 **Response:**
 ```json
 {
-  "text_ai": {
-    "provider": "Groq",
-    "model": "Llama 3.1 8B",
-    "is_configured": true
+  "success": true,
+  "context": {
+    "raw_transcript": "um the patient came in with like chest pain and uh shortness of breath they said it feels like pressure um they have a history of hypertension and diabetes",
+    "patient_name": "Jane Smith",
+    "referral_reason": "Suspected cardiac arrhythmia",
+    "specialty": "Cardiology"
   },
-  "speech_ai": {
-    "provider": "Google Speech Recognition",
-    "model": "Web Speech API",
-    "is_configured": true
+  "cleaned_transcript": "The patient presented with chest pain and shortness of breath. They described the chest pain as pressure-like. The patient has a medical history of hypertension and diabetes.",
+  "tested_by": "admin@mediflow.com",
+  "test_timestamp": "2024-05-15 10:30:45"
+}
+```
+
+#### POST `/ai/test-document-extraction`
+Test AI document information extraction (development endpoint).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Permissions:** Super Admin, Facility Admin, Clinician only
+
+**Request Body:**
+```json
+{
+  "document_type": "lab_report",
+  "document_text": "Patient: Jane Smith\nDate: 2024-05-15\nTroponin I: 0.15 ng/mL (elevated)\nCK-MB: 25 U/L (normal)\nBNP: 450 pg/mL (elevated)\nGlucose: 180 mg/dL (elevated)",
+  "patient_name": "Jane Smith",
+  "age": "45",
+  "gender": "female"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "context": {
+    "document_type": "lab_report",
+    "document_text": "Patient: Jane Smith\nDate: 2024-05-15\nTroponin I: 0.15 ng/mL (elevated)\nCK-MB: 25 U/L (normal)\nBNP: 450 pg/mL (elevated)\nGlucose: 180 mg/dL (elevated)",
+    "patient_name": "Jane Smith",
+    "age": "45",
+    "gender": "female"
   },
-  "document_ai": {
-    "provider": "Tesseract + PDF Libraries",
-    "is_configured": true
+  "extracted_info": {
+    "patient_name": "Jane Smith",
+    "document_date": "2024-05-15",
+    "lab_values": [
+      {
+        "test": "Troponin I",
+        "value": "0.15 ng/mL",
+        "status": "elevated"
+      },
+      {
+        "test": "CK-MB",
+        "value": "25 U/L",
+        "status": "normal"
+      },
+      {
+        "test": "BNP",
+        "value": "450 pg/mL",
+        "status": "elevated"
+      },
+      {
+        "test": "Glucose",
+        "value": "180 mg/dL",
+        "status": "elevated"
+      }
+    ],
+    "summary": "Lab results show elevated troponin I and BNP, indicating possible cardiac stress. Glucose is elevated, suggesting poor glycemic control."
+  },
+  "tested_by": "admin@mediflow.com",
+  "test_timestamp": "2024-05-15 10:30:45"
+}
+```
+
+#### POST `/ai/referral/{referral_id}/summarize`
+Generate AI-powered referral summary for an existing referral.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**URL Parameters:**
+- `referral_id` (integer, required) - ID of the referral to summarize
+
+**Permissions:** Users with referral access permissions
+
+**Response:**
+```json
+{
+  "success": true,
+  "referral_id": 1,
+  "ai_summary": {
+    "summary": "45-year-old male presenting with chest pain and shortness of breath, referred for cardiac evaluation. ECG shows possible abnormal rhythm.",
+    "key_findings": [
+      "Chest pain described as pressure-like, 2/10 severity",
+      "Shortness of breath on minimal exertion",
+      "ECG indicates sinus arrhythmia",
+      "History of hypertension controlled with medication"
+    ],
+    "risks": [
+      "Potential cardiac instability requiring urgent evaluation",
+      "Hypertension as underlying risk factor",
+      "Possible progression to acute cardiac event"
+    ],
+    "missing_info": [
+      "Current vital signs (BP, heart rate, oxygen saturation)",
+      "Cardiac enzymes (troponin, CK-MB)",
+      "Previous ECG comparisons",
+      "Current medication adherence"
+    ],
+    "recommendations": [
+      "Urgent cardiac evaluation within 24 hours",
+      "Complete cardiac workup including enzymes and imaging",
+      "Blood pressure optimization",
+      "Consider stress testing based on evaluation"
+    ],
+    "completeness_score": 60,
+    "urgency_level": "High"
+  },
+  "updated_by": "clinician@mediflow.com",
+  "updated_at": "2024-05-15 10:30:45"
+}
+```
+
+**Note:** This endpoint automatically updates the referral's `ai_summary` and `ai_status` fields in the database.
+
+#### GET `/ai/status`
+Get AI service status and configuration.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Permissions:** Super Admin, Facility Admin only
+
+**Response:**
+```json
+{
+  "ai_service_available": true,
+  "openai_api_key_configured": true,
+  "whisper_model": "large-v3",
+  "supported_operations": [
+    "referral_summarization",
+    "transcription_cleanup",
+    "document_extraction",
+    "missing_info_assessment",
+    "risk_assessment"
+  ],
+  "prompt_templates_available": [
+    "referral_summary",
+    "transcription_cleanup",
+    "document_extraction",
+    "missing_info",
+    "risk_assessment"
+  ],
+  "medical_safety_features": [
+    "disclaimer_inclusion",
+    "uncertainty_handling",
+    "risk_flagging",
+    "missing_info_identification"
+  ],
+  "service_dependencies": {
+    "ai_service": "services/ai_service.py",
+    "prompt_builder": "utils/ai_prompts.py",
+    "text_cleaning": "utils/text_cleaning.py",
+    "audio_processing": "utils/audio_utils.py"
   }
 }
 ```
+
+#### GET `/ai/health`
+Simple health check for AI service (no authentication required).
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "mediflow-ai",
+  "timestamp": "2024-05-15 10:30:45",
+  "mock_mode": false
+}
+```
+
+**Note:** This endpoint can be used for monitoring and load balancing without authentication.
 
 ---
 
@@ -1350,6 +1573,12 @@ Use provided test data scripts to populate database with sample patients, users,
 - ✅ AI status tracking (processing, completed, failed)
 - ✅ Document OCR and text extraction
 - ✅ Voice note transcription with AI cleanup
+
+**Database Compatibility Fixes (May 2026):**
+- ✅ Fixed SQLite compatibility issue with NOW() function
+- ✅ Replaced PostgreSQL-specific `NOW()` with SQLite-compatible `datetime('now')`
+- ✅ Affected AI endpoints: test-summary, test-transcription, test-document-extraction, referral/summarize, health
+- ✅ System now supports both PostgreSQL and SQLite databases
 
 ### Database Migrations
 Run Alembic migrations:

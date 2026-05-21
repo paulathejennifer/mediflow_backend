@@ -321,11 +321,12 @@ async def summarize_voice_note(
         }
 
         # Clean and summarize transcript
-        cleaned_transcript = ai_service.clean_transcription(context)
+        result = await ai_service.clean_transcription(context)
+        cleaned_transcript = result.get('cleaned_transcript', '')
 
         # Update voice note with processed transcript
         voice_note.processed_transcript = cleaned_transcript
-        voice_note.status = VoiceStatus.PROCESSED
+        voice_note.status = VoiceStatus.TRANSCRIBED
         db.commit()
         db.refresh(voice_note)
 
