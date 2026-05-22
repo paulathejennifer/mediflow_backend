@@ -4,10 +4,10 @@ from app.utils.audit_utils import AuditService, create_audit_logger
 
 __all__ = [
     "PermissionChecker",
-    "get_permission_checker", 
+    "get_permission_checker",
     "FileUtils",
     "DocumentHandler",
     "AudioHandler",
     "AuditService",
-    "create_audit_logger"
+    "create_audit_logger",
 ]
