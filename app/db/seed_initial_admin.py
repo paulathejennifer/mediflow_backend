@@ -45,12 +45,7 @@ def create_initial_super_admin():
             print("✅ Super admin already exists: admin@mediflow.com")
             print(f"   User ID: {existing_admin.id}")
             print(f"   Role: {existing_admin.role}")
-            print("⚠️  Updating password hash to use consistent method...")
-
-            # Update password hash to use consistent method
-            existing_admin.password_hash = hashed_password
-            db.commit()
-            print("✅ Password hash updated successfully!")
+            print("⚠️  Existing super admin preserved; no password reset performed.")
             return existing_admin
 
         # Create the super admin

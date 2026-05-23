@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.api import api_router
 from app.core.config import settings
+from app.db.seed_initial_admin import create_initial_super_admin
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -21,6 +22,14 @@ app.add_middleware(
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.on_event("startup")
+def startup_event():
+    try:
+        create_initial_super_admin()
+    except Exception as e:
+        print(f"Super admin seed failed: {e}")
 
 
 @app.get("/health")
