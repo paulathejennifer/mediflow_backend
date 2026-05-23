@@ -1,0 +1,45 @@
+# ============================================================
+# Render Blueprint - MediFlow Backend
+# Deploy with: https://render.com/deploy
+# ============================================================
+
+services:
+  - type: web
+    name: mediflow-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mediflow-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: TESSERACT_PATH
+        value: /usr/bin/tesseract
+      - key: UPLOAD_DIR
+        value: /app/uploads
+      - key: ALLOWED_HOSTS
+        value: '["*"]'
+      - key: FRONTEND_URL
+        value: "http://localhost:3000"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+
+databases:
+  - name: mediflow-db
+    plan: free
+    databaseName: mediflow
+    user: mediflow

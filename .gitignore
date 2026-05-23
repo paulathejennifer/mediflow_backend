@@ -179,8 +179,8 @@ uploads/
 media/
 static/
 
-# AI Model files and caches
-models/
+# AI Model files and caches (at repo root only, not app/models/)
+/models/
 .cache/
 models_cache/
 *.pkl
@@ -227,8 +227,8 @@ test_data/
 *.crt
 *.p12
 
-# Docker
-.dockerignore
+# Docker (keep .dockerignore tracked)
+
 
 # Kubernetes
 *.yaml.local

@@ -15,7 +15,6 @@ import librosa
 import soundfile as sf
 import numpy as np
 from app.core.config import settings
-from app.utils.audio_utils import AudioProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -136,10 +135,10 @@ class SpeechAIService:
             )
 
             # Load audio
-            y, sr = librosa.load(audio_path, sr=None)
+            y, sr_rate = librosa.load(audio_path, sr=None)
 
             # Save as WAV
-            sf.write(wav_path, y, sr)
+            sf.write(wav_path, y, sr_rate)
 
             logger.info(f"Audio converted to WAV: {audio_path} -> {wav_path}")
             return wav_path
@@ -151,8 +150,8 @@ class SpeechAIService:
     def _get_audio_duration(self, audio_path: str) -> float:
         """Get audio duration in seconds."""
         try:
-            y, sr = librosa.load(audio_path, sr=None)
-            duration = len(y) / sr
+            y, sr_rate = librosa.load(audio_path, sr=None)
+            duration = len(y) / sr_rate
             return round(duration, 2)
         except Exception:
             return 0.0
