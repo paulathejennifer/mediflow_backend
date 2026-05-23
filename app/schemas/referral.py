@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
+
 class ReferralBase(BaseModel):
     patient_id: int
     to_facility_id: int
@@ -9,8 +10,10 @@ class ReferralBase(BaseModel):
     reason_for_referral: Optional[str] = None
     clinical_notes: Optional[str] = None
 
+
 class ReferralCreate(ReferralBase):
     pass
+
 
 class ReferralUpdate(BaseModel):
     status: Optional[str] = None
@@ -18,6 +21,7 @@ class ReferralUpdate(BaseModel):
     reason_for_referral: Optional[str] = None
     clinical_notes: Optional[str] = None
     notes: Optional[str] = None
+
 
 class ReferralResponse(ReferralBase):
     id: int
@@ -29,9 +33,10 @@ class ReferralResponse(ReferralBase):
     notes: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
+
     class Config:
         from_attributes = True
+
 
 class ReferralSummary(BaseModel):
     id: int
@@ -41,9 +46,10 @@ class ReferralSummary(BaseModel):
     status: str
     priority: str
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
+
 
 class ReferralWithDetails(ReferralResponse):
     patient: Optional[dict] = None

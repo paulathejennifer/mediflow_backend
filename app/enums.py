@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 # Core system
 class UserRole(str, Enum):
     SUPER_ADMIN = "super_admin"
@@ -7,11 +8,13 @@ class UserRole(str, Enum):
     CLINICIAN = "clinician"
     PATIENT = "patient"
 
+
 # Patient
 class Gender(str, Enum):
     MALE = "male"
     FEMALE = "female"
     OTHER = "other"
+
 
 # Facility
 class FacilityType(str, Enum):
@@ -21,6 +24,7 @@ class FacilityType(str, Enum):
     DISPENSARY = "dispensary"
     REFERRAL_CENTER = "referral_center"
 
+
 class FacilityLevel(str, Enum):
     LEVEL_1 = "level_1"
     LEVEL_2 = "level_2"
@@ -28,6 +32,7 @@ class FacilityLevel(str, Enum):
     LEVEL_4 = "level_4"
     LEVEL_5 = "level_5"
     LEVEL_6 = "level_6"
+
 
 # Referral
 class ReferralStatus(str, Enum):
@@ -39,11 +44,13 @@ class ReferralStatus(str, Enum):
     COMPLETED = "completed"
     REJECTED = "rejected"
 
+
 class Priority(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     EMERGENCY = "emergency"
+
 
 class ReferralReason(str, Enum):
     EMERGENCY_CARE = "emergency_care"
@@ -54,6 +61,7 @@ class ReferralReason(str, Enum):
     FOLLOW_UP_CARE = "follow_up_care"
     UNKNOWN = "unknown"
 
+
 # Documents
 class DocumentType(str, Enum):
     LAB_REPORT = "lab_report"
@@ -63,6 +71,7 @@ class DocumentType(str, Enum):
     REFERRAL_NOTE = "referral_note"
     OTHER = "other"
 
+
 # Voice
 class VoiceStatus(str, Enum):
     UPLOADED = "uploaded"
@@ -70,12 +79,14 @@ class VoiceStatus(str, Enum):
     TRANSCRIBED = "transcribed"
     FAILED = "failed"
 
+
 # AI Processing
 class AIStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+
 
 # Audit Actions
 class AuditAction(str, Enum):

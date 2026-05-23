@@ -37,8 +37,10 @@ class SpeechAIService:
             logger.info("Google Speech Recognition initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize speech recognizer: {str(e)}")
-    
-    async def transcribe_audio(self, audio_path: str, language: str = "en-US") -> Dict[str, Any]:
+
+    async def transcribe_audio(
+        self, audio_path: str, language: str = "en-US"
+    ) -> Dict[str, Any]:
         """
         Transcribe audio file using Google Speech Recognition.
 
@@ -67,12 +69,16 @@ class SpeechAIService:
 
                     # Use Google Speech Recognition
                     try:
-                        transcript = self.recognizer.recognize_google(audio_data, language=language)
+                        transcript = self.recognizer.recognize_google(
+                            audio_data, language=language
+                        )
                         return transcript, True
                     except sr.UnknownValueError:
                         return "", False
                     except sr.RequestError as e:
-                        raise Exception(f"Google Speech Recognition service error: {str(e)}")
+                        raise Exception(
+                            f"Google Speech Recognition service error: {str(e)}"
+                        )
 
             transcript, success = await loop.run_in_executor(None, sync_transcribe)
 
@@ -81,7 +87,9 @@ class SpeechAIService:
                 os.remove(wav_path)
 
             if not success or not transcript:
-                raise Exception("Speech recognition failed - could not understand audio")
+                raise Exception(
+                    "Speech recognition failed - could not understand audio"
+                )
 
             word_count = len(transcript.split())
 
@@ -96,14 +104,14 @@ class SpeechAIService:
                 "segments": [],
                 "processing_info": {
                     "audio_converted": wav_path != audio_path,
-                    "service": "Google Speech Recognition"
-                }
+                    "service": "Google Speech Recognition",
+                },
             }
 
         except Exception as e:
             logger.error(f"Audio transcription failed: {str(e)}")
             raise Exception(f"Failed to transcribe audio: {str(e)}")
-    
+
     async def _convert_to_wav(self, audio_path: str) -> str:
         """
         Convert audio file to WAV format for Google Speech Recognition.
@@ -116,12 +124,15 @@ class SpeechAIService:
         """
         try:
             # Check if already WAV
-            if audio_path.lower().endswith('.wav'):
+            if audio_path.lower().endswith(".wav"):
                 return audio_path
 
             # Create temporary WAV file
             temp_dir = tempfile.gettempdir()
-            wav_path = os.path.join(temp_dir, f"converted_{os.path.splitext(os.path.basename(audio_path))[0]}.wav")
+            wav_path = os.path.join(
+                temp_dir,
+                f"converted_{os.path.splitext(os.path.basename(audio_path))[0]}.wav",
+            )
 
             # Load audio
             y, sr_rate = librosa.load(audio_path, sr=None)
@@ -144,7 +155,7 @@ class SpeechAIService:
             return round(duration, 2)
         except Exception:
             return 0.0
-    
+
     def get_model_info(self) -> Dict[str, Any]:
         """Get information about the speech recognition service being used."""
         return {
@@ -156,21 +167,34 @@ class SpeechAIService:
                 "Multi-language support",
                 "Real-time transcription",
                 "High accuracy transcription",
-                "Noise robust processing"
+                "Noise robust processing",
             ],
             "is_configured": True,
             "supported_languages": [
-                "en-US", "en-GB", "es-ES", "fr-FR", "de-DE", "it-IT", "pt-BR",
-                "zh-CN", "ja-JP", "ko-KR", "ru-RU", "ar-SA", "hi-IN", "tr-TR"
+                "en-US",
+                "en-GB",
+                "es-ES",
+                "fr-FR",
+                "de-DE",
+                "it-IT",
+                "pt-BR",
+                "zh-CN",
+                "ja-JP",
+                "ko-KR",
+                "ru-RU",
+                "ar-SA",
+                "hi-IN",
+                "tr-TR",
             ],
             "recommended_settings": {
                 "sample_rate": 16000,
                 "channels": 1,  # Mono
                 "audio_format": "wav",
                 "max_file_size_mb": 10,
-                "optimal_duration": "30 seconds to 2 minutes"
-            }
+                "optimal_duration": "30 seconds to 2 minutes",
+            },
         }
+
 
 # Global instance
 speech_ai_service = SpeechAIService()

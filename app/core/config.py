@@ -4,6 +4,7 @@ import secrets
 import warnings
 
 
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Mediflow Backend"
     VERSION: str = "1.0.0"
@@ -19,6 +20,13 @@ class Settings(BaseSettings):
 
     # Security (required — no insecure default)
     SECRET_KEY: str = ""
+    # Database
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL", "postgresql://user:password@localhost/mediflow"
+    )
+
+    # Security
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ALGORITHM: str = "HS256"
 
@@ -38,6 +46,7 @@ class Settings(BaseSettings):
 
     # OCR Configuration
     TESSERACT_PATH: str = ""
+    TESSERACT_PATH: str = os.getenv("TESSERACT_PATH", "")
 
     # SMTP Configuration (Google SMTP)
     SMTP_HOST: str = "smtp.gmail.com"
@@ -56,6 +65,7 @@ class Settings(BaseSettings):
 
     # Server
     PORT: int = 8000
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
     class Config:
         env_file = ".env"

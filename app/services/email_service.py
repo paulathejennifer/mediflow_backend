@@ -21,9 +21,10 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class EmailService:
     """Service for sending emails via SMTP."""
-    
+
     def __init__(self):
         self.smtp_server = settings.SMTP_HOST
         self.smtp_port = settings.SMTP_PORT
@@ -32,15 +33,17 @@ class EmailService:
         self.from_email = settings.SMTP_FROM_EMAIL
         self.from_name = settings.SMTP_FROM_NAME
         self.use_tls = settings.SMTP_USE_TLS
-        
+
         # Validate configuration
         if not all([self.smtp_username, self.smtp_password, self.from_email]):
             logger.warning("Email service not fully configured - using demo mode")
             self.demo_mode = True
         else:
             self.demo_mode = False
-    
-    async def send_password_reset(self, email: str, token: str, user_name: Optional[str] = None) -> Dict[str, Any]:
+
+    async def send_password_reset(
+        self, email: str, token: str, user_name: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Send password reset email.
 
@@ -53,12 +56,12 @@ class EmailService:
             Dict with email delivery status
         """
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-        
+
         # Personalize greeting
         greeting = f"Hello {user_name}," if user_name else "Hello,"
-        
+
         subject = "Reset Your MediFlow Password"
-        
+
         # HTML email template
         html_body = f"""
         <!DOCTYPE html>
@@ -153,7 +156,7 @@ class EmailService:
         </body>
         </html>
         """
-        
+
         # Plain text version
         text_body = f"""
         Reset Your MediFlow Password
@@ -171,27 +174,29 @@ class EmailService:
         This is an automated message from MediFlow Healthcare Platform.
         © 2024 MediFlow. All rights reserved.
         """
-        
+
         return await self._send_email(email, subject, html_body, text_body)
-    
-    async def send_email_verification(self, email: str, token: str, user_name: Optional[str] = None) -> Dict[str, Any]:
+
+    async def send_email_verification(
+        self, email: str, token: str, user_name: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Send email verification email.
-        
+
         Args:
             email: Recipient email address
             token: Email verification token
             user_name: Optional user's first name
-            
+
         Returns:
             Dict with email delivery status
         """
         verification_link = f"https://app.mediflow.com/verify-email?token={token}"
-        
+
         greeting = f"Hello {user_name}," if user_name else "Hello,"
-        
+
         subject = "Verify Your MediFlow Email"
-        
+
         # HTML email template
         html_body = f"""
         <!DOCTYPE html>
@@ -294,7 +299,7 @@ class EmailService:
         </body>
         </html>
         """
-        
+
         # Plain text version
         text_body = f"""
         Verify Your MediFlow Email
@@ -318,27 +323,29 @@ class EmailService:
         This is an automated message from MediFlow Healthcare Platform.
         © 2024 MediFlow. All rights reserved.
         """
-        
+
         return await self._send_email(email, subject, html_body, text_body)
-    
-    async def send_welcome_email(self, email: str, user_name: str, facility_name: Optional[str] = None) -> Dict[str, Any]:
+
+    async def send_welcome_email(
+        self, email: str, user_name: str, facility_name: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Send welcome email to new users.
-        
+
         Args:
             email: Recipient email address
             user_name: User's first name
             facility_name: Optional facility name
-            
+
         Returns:
             Dict with email delivery status
         """
         subject = "Welcome to MediFlow Healthcare Platform"
-        
+
         greeting = f"Hello {user_name},"
-        
+
         facility_text = f"at {facility_name}" if facility_name else ""
-        
+
         # HTML email template
         html_body = f"""
         <!DOCTYPE html>
@@ -443,7 +450,7 @@ class EmailService:
         </body>
         </html>
         """
-        
+
         # Plain text version
         text_body = f"""
         Welcome to MediFlow Healthcare Platform
@@ -470,24 +477,26 @@ class EmailService:
         This is an automated message from MediFlow Healthcare Platform.
         © 2024 MediFlow. All rights reserved.
         """
-        
+
         return await self._send_email(email, subject, html_body, text_body)
-    
-    async def _send_email(self, to_email: str, subject: str, html_body: str, text_body: str) -> Dict[str, Any]:
+
+    async def _send_email(
+        self, to_email: str, subject: str, html_body: str, text_body: str
+    ) -> Dict[str, Any]:
         """
         Send email using SMTP.
-        
+
         Args:
             to_email: Recipient email address
             subject: Email subject
             html_body: HTML email body
             text_body: Plain text email body
-            
+
         Returns:
             Dict with email delivery status
         """
         start_time = datetime.utcnow()
-        
+
         try:
             # Demo mode - log email instead of sending
             if self.demo_mode:
@@ -499,34 +508,34 @@ class EmailService:
                     "to_email": to_email,
                     "subject": subject,
                     "sent_at": start_time.isoformat(),
-                    "demo_mode": True
+                    "demo_mode": True,
                 }
-            
+
             # Create message
-            msg = MIMEMultipart('alternative')
-            msg['From'] = f"{self.from_name} <{self.from_email}>"
-            msg['To'] = to_email
-            msg['Subject'] = subject
-            
+            msg = MIMEMultipart("alternative")
+            msg["From"] = f"{self.from_name} <{self.from_email}>"
+            msg["To"] = to_email
+            msg["Subject"] = subject
+
             # Attach both plain text and HTML versions
-            text_part = MIMEText(text_body, 'plain', 'utf-8')
-            html_part = MIMEText(html_body, 'html', 'utf-8')
-            
+            text_part = MIMEText(text_body, "plain", "utf-8")
+            html_part = MIMEText(html_body, "html", "utf-8")
+
             msg.attach(text_part)
             msg.attach(html_part)
-            
+
             # Send email
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 if self.use_tls:
                     server.starttls()
                 server.login(self.smtp_username, self.smtp_password)
                 server.send_message(msg)
-            
+
             end_time = datetime.utcnow()
             duration = (end_time - start_time).total_seconds()
-            
+
             logger.info(f"Email sent successfully to {to_email} in {duration:.2f}s")
-            
+
             return {
                 "success": True,
                 "message": "Email sent successfully",
@@ -534,13 +543,13 @@ class EmailService:
                 "subject": subject,
                 "sent_at": start_time.isoformat(),
                 "duration_seconds": duration,
-                "demo_mode": False
+                "demo_mode": False,
             }
-            
+
         except Exception as e:
             error_msg = f"Failed to send email to {to_email}: {str(e)}"
             logger.error(error_msg)
-            
+
             return {
                 "success": False,
                 "message": error_msg,
@@ -548,13 +557,13 @@ class EmailService:
                 "subject": subject,
                 "attempted_at": start_time.isoformat(),
                 "error": str(e),
-                "demo_mode": self.demo_mode
+                "demo_mode": self.demo_mode,
             }
-    
+
     def test_email_configuration(self) -> Dict[str, Any]:
         """
         Test email service configuration.
-        
+
         Returns:
             Dict with configuration test results
         """
@@ -565,12 +574,14 @@ class EmailService:
             "smtp_username": self.smtp_username,
             "from_email": self.from_email,
             "from_name": self.from_name,
-            "demo_mode": self.demo_mode
+            "demo_mode": self.demo_mode,
         }
-        
+
         if self.demo_mode:
-            results["message"] = "Email service is in demo mode - configure SMTP credentials to enable sending"
+            results[
+                "message"
+            ] = "Email service is in demo mode - configure SMTP credentials to enable sending"
         else:
             results["message"] = "Email service is configured and ready to send emails"
-        
+
         return results

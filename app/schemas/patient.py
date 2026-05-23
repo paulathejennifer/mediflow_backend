@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime, date
 
+
 class PatientBase(BaseModel):
     first_name: str
     last_name: str
@@ -17,8 +18,10 @@ class PatientBase(BaseModel):
     medications: Optional[str] = None
     chronic_conditions: Optional[str] = None
 
+
 class PatientCreate(PatientBase):
     pass
+
 
 class PatientUpdate(BaseModel):
     first_name: Optional[str] = None
@@ -35,13 +38,15 @@ class PatientUpdate(BaseModel):
     medications: Optional[str] = None
     chronic_conditions: Optional[str] = None
 
+
 class PatientResponse(PatientBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
+
     class Config:
         from_attributes = True
+
 
 class PatientIdentifier(BaseModel):
     id: int
@@ -50,9 +55,10 @@ class PatientIdentifier(BaseModel):
     facility_name: Optional[str] = None
     facility_code: Optional[str] = None
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
+
 
 class PatientWithIdentifiers(PatientResponse):
     identifiers: List[PatientIdentifier] = []

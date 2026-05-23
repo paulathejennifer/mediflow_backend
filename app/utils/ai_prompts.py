@@ -10,10 +10,11 @@ medical safety and accuracy.
 from typing import Dict, Any
 from datetime import datetime
 
+
 def build_referral_summary_prompt(context: Dict[str, Any]) -> str:
     """
     Build a comprehensive prompt for referral summarization.
-    
+
     This prompt guides the AI to create structured, clinically relevant
     summaries for receiving clinicians while emphasizing safety and uncertainty.
     """
@@ -83,10 +84,11 @@ MEDICAL SAFETY NOTE:
 [Brief disclaimer about AI assistance and clinician judgment]
 """
 
+
 def build_transcription_cleanup_prompt(context: Dict[str, Any]) -> str:
     """
     Build prompt for cleaning up voice-to-text transcriptions.
-    
+
     This focuses on medical terminology, formatting, and removing
     conversational artifacts while preserving clinical meaning.
     """
@@ -134,10 +136,11 @@ NOTES:
 [Any concerns about audio quality or unclear sections]
 """
 
+
 def build_document_extraction_prompt(context: Dict[str, Any]) -> str:
     """
     Build prompt for extracting key information from medical documents.
-    
+
     This focuses on pulling relevant clinical data from various document types.
     """
     return f"""
@@ -191,10 +194,11 @@ EXTRACTION CONFIDENCE:
 [High/Medium/Low - based on document clarity]
 """
 
+
 def build_missing_info_prompt(context: Dict[str, Any]) -> str:
     """
     Build prompt for identifying missing critical information in referrals.
-    
+
     This helps ensure complete information transfer between facilities.
     """
     return f"""
@@ -254,10 +258,11 @@ URGENCY OF COMPLETION:
 [Immediate/Soon/When possible - based on risk level]
 """
 
+
 def build_risk_flag_prompt(context: Dict[str, Any]) -> str:
     """
     Build prompt for identifying and flagging clinical risks in referrals.
-    
+
     This helps prioritize referrals and identify safety concerns.
     """
     return f"""
@@ -320,6 +325,7 @@ OVERALL RISK LEVEL:
 RECOMMENDED ACTIONS:
 [Specific actions for receiving facility]
 """
+
 
 def build_ai_disclaimer_prompt() -> str:
     """

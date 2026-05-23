@@ -6,6 +6,7 @@ from app.models.patient import Patient
 from app.models.patient_identifier import PatientIdentifier
 from typing import Tuple
 
+
 class MRNService:
     def __init__(self, db: Session):
         self.db = db
@@ -13,14 +14,14 @@ class MRNService:
     def generate_mrn(self, facility_id: int, facility_code: str) -> str:
         """
         Generate a unique MRN with concurrency safety using row locking.
-        
+
         Args:
             facility_id: The ID of the facility
             facility_code: The facility code (e.g., "KNRH")
-            
+
         Returns:
             A unique MRN string (e.g., "KNRH-00001")
-            
+
         Raises:
             Exception: If database operation fails
         """
@@ -36,8 +37,7 @@ class MRNService:
             # If no counter exists, create it
             if not counter:
                 counter = FacilityCounter(
-                    facility_id=facility_id,
-                    last_patient_number=0
+                    facility_id=facility_id, last_patient_number=0
                 )
                 self.db.add(counter)
                 self.db.flush()  # Ensure it exists in DB before locking again
@@ -59,11 +59,11 @@ class MRNService:
         """
         Alternative atomic method using UPDATE...RETURNING.
         This is more performant for high concurrency scenarios.
-        
+
         Args:
             facility_id: The ID of the facility
             facility_code: The facility code (e.g., "KNRH")
-            
+
         Returns:
             A unique MRN string (e.g., "KNRH-00001")
         """
@@ -74,12 +74,11 @@ class MRNService:
                 .filter(FacilityCounter.facility_id == facility_id)
                 .first()
             )
-            
+
             if not counter_exists:
                 # Create counter atomically
                 counter = FacilityCounter(
-                    facility_id=facility_id,
-                    last_patient_number=0
+                    facility_id=facility_id, last_patient_number=0
                 )
                 self.db.add(counter)
                 self.db.flush()
@@ -91,10 +90,10 @@ class MRNService:
                 .values(last_patient_number=FacilityCounter.last_patient_number + 1)
                 .returning(FacilityCounter.last_patient_number)
             )
-            
+
             new_number = result.scalar()
             mrn = f"{facility_code}-{str(new_number).zfill(5)}"
-            
+
             return mrn
 
         except Exception as e:
@@ -102,21 +101,21 @@ class MRNService:
             raise Exception(f"Failed to generate MRN atomically: {str(e)}")
 
     def create_patient_with_mrn(
-        self, 
-        patient_data: dict, 
+        self,
+        patient_data: dict,
         facility_id: int,
         facility_code: str,
-        use_atomic: bool = False
+        use_atomic: bool = False,
     ) -> Tuple[Patient, PatientIdentifier]:
         """
         Create a patient and generate MRN in a single transaction.
-        
+
         Args:
             patient_data: Dictionary with patient information
             facility_id: The ID of the facility
             facility_code: The facility code
             use_atomic: Whether to use atomic MRN generation
-            
+
         Returns:
             Tuple of (Patient, PatientIdentifier)
         """
@@ -142,7 +141,7 @@ class MRNService:
                 allergies=patient_data.get("allergies"),
                 medications=patient_data.get("medications"),
                 chronic_conditions=patient_data.get("chronic_conditions"),
-                facility_id=facility_id
+                facility_id=facility_id,
             )
 
             self.db.add(patient)
@@ -155,7 +154,7 @@ class MRNService:
                 identifier_value=mrn,
                 facility_id=facility_id,
                 is_primary=True,
-                mrn=mrn
+                mrn=mrn,
             )
 
             self.db.add(identifier)
@@ -170,51 +169,51 @@ class MRNService:
     def validate_mrn_format(self, mrn: str) -> bool:
         """
         Validate MRN format (e.g., "KNRH-00001").
-        
+
         Args:
             mrn: The MRN string to validate
-            
+
         Returns:
             True if format is valid, False otherwise
         """
         import re
-        
+
         # Pattern: FACILITYCODE-5digits
-        pattern = r'^[A-Z]+-\d{5}$'
+        pattern = r"^[A-Z]+-\d{5}$"
         return bool(re.match(pattern, mrn))
 
     def parse_mrn(self, mrn: str) -> Tuple[str, int]:
         """
         Parse MRN to extract facility code and patient number.
-        
+
         Args:
             mrn: The MRN string to parse
-            
+
         Returns:
             Tuple of (facility_code, patient_number)
-            
+
         Raises:
             ValueError: If MRN format is invalid
         """
         if not self.validate_mrn_format(mrn):
             raise ValueError(f"Invalid MRN format: {mrn}")
-        
-        facility_code, patient_number_str = mrn.split('-')
+
+        facility_code, patient_number_str = mrn.split("-")
         patient_number = int(patient_number_str)
-        
+
         return facility_code, patient_number
 
     def get_patient_by_mrn(self, facility_id: int, mrn: str) -> Patient:
         """
         Get patient by MRN within a specific facility.
-        
+
         Args:
             facility_id: The facility ID
             mrn: The MRN to search for
-            
+
         Returns:
             Patient object
-            
+
         Raises:
             ValueError: If patient not found
         """
@@ -222,12 +221,14 @@ class MRNService:
             self.db.query(PatientIdentifier)
             .filter(
                 PatientIdentifier.facility_id == facility_id,
-                PatientIdentifier.mrn == mrn
+                PatientIdentifier.mrn == mrn,
             )
             .first()
         )
-        
+
         if not identifier:
-            raise ValueError(f"Patient with MRN {mrn} not found in facility {facility_id}")
-        
+            raise ValueError(
+                f"Patient with MRN {mrn} not found in facility {facility_id}"
+            )
+
         return identifier.patient

@@ -21,205 +21,218 @@ from app.utils.ai_prompts import (
     build_document_extraction_prompt,
     build_missing_info_prompt,
     build_risk_flag_prompt,
-    build_ai_disclaimer_prompt
+    build_ai_disclaimer_prompt,
 )
 from app.core.config import settings
 from app.services.text_ai_service import text_ai_service
 from app.services.speech_ai_service import speech_ai_service
 from app.services.document_ai_service import document_ai_service
 
+
 class AIService:
     """Service for AI-powered clinical operations using multiple AI models."""
-    
+
     def __init__(self, db: Session):
         self.db = db
         # Initialize AI services
         self.text_ai = text_ai_service
         self.speech_ai = speech_ai_service
         self.document_ai = document_ai_service
-        
-    async def generate_referral_summary(self, context: Dict[str, Any]) -> Dict[str, str]:
+
+    async def generate_referral_summary(
+        self, context: Dict[str, Any]
+    ) -> Dict[str, str]:
         """
         Generate AI-powered referral summary using Groq Llama 3.1.
-        
+
         Args:
             context: Dictionary containing patient and referral information
-            
+
         Returns:
             Dictionary with structured summary components
         """
         try:
             prompt = build_referral_summary_prompt(context)
-            
+
             # Use Groq Llama 3.1 for text summarization
             response = await self.text_ai.generate_referral_summary(prompt)
-            
+
             return response
-            
+
         except Exception as e:
             raise Exception(f"Failed to generate referral summary: {str(e)}")
-    
+
     async def clean_transcription(self, context: Dict[str, Any]) -> Dict[str, str]:
         """
         Clean and format voice-to-text transcription using Groq Llama 3.1.
-        
+
         Args:
             context: Dictionary containing raw transcript and clinical context
-            
+
         Returns:
             Dictionary with cleaned transcription and metadata
         """
         try:
             prompt = build_transcription_cleanup_prompt(context)
-            
+
             # Use Groq Llama 3.1 for text cleanup
             response = await self.text_ai.clean_transcription(prompt)
-            
+
             return response
-            
+
         except Exception as e:
             raise Exception(f"Failed to clean transcription: {str(e)}")
-    
+
     async def extract_document_info(self, context: Dict[str, Any]) -> Dict[str, str]:
         """
         Extract key information from medical documents using Groq Llama 3.1.
-        
+
         Args:
             context: Dictionary containing document text and metadata
-            
+
         Returns:
             Dictionary with extracted clinical information
         """
         try:
             prompt = build_document_extraction_prompt(context)
-            
+
             # Use Groq Llama 3.1 for document analysis
             response = await self.text_ai.extract_document_info(prompt)
-            
+
             return response
-            
+
         except Exception as e:
             raise Exception(f"Failed to extract document information: {str(e)}")
-    
+
     async def identify_missing_info(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Identify missing critical information in referrals using Groq Llama 3.1.
-        
+
         Args:
             context: Dictionary containing referral information
-            
+
         Returns:
             Dictionary with missing information assessment
         """
         try:
             prompt = build_missing_info_prompt(context)
-            
+
             # Use Groq Llama 3.1 for missing info analysis
             response = await self.text_ai.identify_missing_info(prompt)
-            
+
             return response
-            
+
         except Exception as e:
             raise Exception(f"Failed to identify missing information: {str(e)}")
-    
+
     async def assess_risks(self, context: Dict[str, Any]) -> Dict[str, str]:
         """
         Assess clinical risks in referrals using Groq Llama 3.1.
-        
+
         Args:
             context: Dictionary containing patient and clinical information
-            
+
         Returns:
             Dictionary with risk assessment results
         """
         try:
             prompt = build_risk_flag_prompt(context)
-            
+
             # Use Groq Llama 3.1 for risk assessment
             response = await self.text_ai.assess_risks(prompt)
-            
+
             return response
-            
+
         except Exception as e:
             raise Exception(f"Failed to assess risks: {str(e)}")
-    
-    async def transcribe_audio(self, audio_path: str, language: str = "en") -> Dict[str, Any]:
+
+    async def transcribe_audio(
+        self, audio_path: str, language: str = "en"
+    ) -> Dict[str, Any]:
         """
         Transcribe audio file using Whisper Large-v3.
-        
+
         Args:
             audio_path: Path to audio file
             language: Language code (default: 'en')
-            
+
         Returns:
             Dictionary with transcription results
         """
         try:
             # Use Whisper for speech-to-text
             response = await self.speech_ai.transcribe_audio(audio_path, language)
-            
+
             return response
-            
+
         except Exception as e:
             raise Exception(f"Failed to transcribe audio: {str(e)}")
-    
-    async def extract_text_from_document(self, file_path: str, document_type: str = "auto") -> Dict[str, Any]:
+
+    async def extract_text_from_document(
+        self, file_path: str, document_type: str = "auto"
+    ) -> Dict[str, Any]:
         """
         Extract text from document using OCR and PDF processing.
-        
+
         Args:
             file_path: Path to document file
             document_type: Type of document ('pdf', 'image', 'auto')
-            
+
         Returns:
             Dictionary with extracted text and metadata
         """
         try:
             # Use document AI service for OCR and text extraction
-            response = await self.document_ai.extract_text_from_document(file_path, document_type)
-            
+            response = await self.document_ai.extract_text_from_document(
+                file_path, document_type
+            )
+
             return response
-            
+
         except Exception as e:
             raise Exception(f"Failed to extract text from document: {str(e)}")
-    
-    async def extract_structured_document_data(self, file_path: str, document_type: str = "auto") -> Dict[str, Any]:
+
+    async def extract_structured_document_data(
+        self, file_path: str, document_type: str = "auto"
+    ) -> Dict[str, Any]:
         """
         Extract structured medical data from document.
-        
+
         Args:
             file_path: Path to document file
             document_type: Type of document
-            
+
         Returns:
             Dictionary with structured medical information
         """
         try:
             # Use document AI service for structured extraction
-            response = await self.document_ai.extract_structured_data(file_path, document_type)
-            
+            response = await self.document_ai.extract_structured_data(
+                file_path, document_type
+            )
+
             return response
-            
+
         except Exception as e:
             raise Exception(f"Failed to extract structured document data: {str(e)}")
-    
+
     def _parse_structured_response(self, response: str) -> Dict[str, str]:
         """
         Parse structured AI response into dictionary.
-        
+
         Args:
             response: AI model response text
-            
+
         Returns:
             Dictionary with parsed sections
         """
         sections = {}
         current_section = None
-        lines = response.split('\n')
-        
+        lines = response.split("\n")
+
         for line in lines:
             line = line.strip()
-            if ':' in line and line.isupper():
+            if ":" in line and line.isupper():
                 # New section
                 current_section = line
                 sections[current_section] = ""
@@ -229,9 +242,9 @@ class AIService:
                     sections[current_section] += "\n" + line
                 else:
                     sections[current_section] = line
-        
+
         return sections
-    
+
     def _get_mock_response(self, prompt: str) -> str:
         """Generate mock response based on prompt content."""
         if "SUMMARY:" in prompt:
@@ -240,7 +253,7 @@ class AIService:
             return self._get_mock_transcription_cleanup()
         else:
             return "Mock AI response - Implement actual API integration"
-    
+
     def _get_mock_referral_summary(self) -> str:
         """Mock referral summary response."""
         return """
@@ -276,7 +289,7 @@ Medium - Limited vital signs and diagnostic data
 MEDICAL SAFETY NOTE:
 This AI-generated summary is for informational purposes only and does not replace clinical judgment. Receiving clinicians should review all source documents and perform their own assessment.
 """
-    
+
     def _get_mock_transcription_cleanup(self) -> str:
         """Mock transcription cleanup response."""
         return """
@@ -298,7 +311,7 @@ High - Clear audio quality with minimal background noise
 NOTES:
 Some medication dosage information unclear - recommend verification with patient.
 """
-    
+
     def _get_mock_document_extraction(self) -> str:
         """Mock document extraction response."""
         return """
@@ -330,7 +343,7 @@ Medium - Non-acute but requires cardiology evaluation
 EXTRACTION CONFIDENCE:
 High - Clear, complete ECG report with standard measurements
 """
-    
+
     def _get_mock_missing_info(self) -> str:
         """Mock missing information assessment."""
         return """
@@ -363,7 +376,7 @@ RECOMMENDED ACTIONS:
 URGENCY OF COMPLETION:
 Immediate - Critical information missing for appropriate triage and treatment
 """
-    
+
     def _get_mock_risk_assessment(self) -> str:
         """Mock risk assessment response."""
         return """
@@ -414,7 +427,7 @@ RECOMMENDED ACTIONS:
             "integration_status": {
                 "groq_configured": self.text_ai.client is not None,
                 "whisper_loaded": self.speech_ai.model is not None,
-                "tesseract_available": self.document_ai.tesseract_available
+                "tesseract_available": self.document_ai.tesseract_available,
             },
             "capabilities": {
                 "text_summarization": "Groq Llama 3.1 8B",
@@ -422,17 +435,18 @@ RECOMMENDED ACTIONS:
                 "document_ocr": "Tesseract + PDF libraries",
                 "medical_entity_extraction": "Integrated with text processing",
                 "risk_assessment": "Groq Llama 3.1 8B",
-                "missing_info_detection": "Groq Llama 3.1 8B"
+                "missing_info_detection": "Groq Llama 3.1 8B",
             },
             "api_endpoints": [
                 "/ai/test-summary",
-                "/ai/test-transcription", 
+                "/ai/test-transcription",
                 "/ai/test-document-extraction",
                 "/ai/referral/{id}/summarize",
                 "/ai/status",
-                "/ai/health"
-            ]
+                "/ai/health",
+            ],
         }
+
 
 def get_ai_service(db: Session) -> AIService:
     """Get AI service instance."""
