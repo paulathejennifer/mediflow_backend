@@ -12,6 +12,13 @@ from app.core.security import (
     generate_refresh_token_string,
     verify_token,
 )
+
+
+def normalize_email(email: str) -> str:
+    if isinstance(email, str):
+        return email.strip().lower()
+    return email
+
 from app.core.database import get_db
 from app.enums import UserRole
 from typing import Optional
@@ -24,6 +31,7 @@ class AuthService:
 
     def authenticate_user(self, email: str, password: str) -> Optional[User]:
         """Authenticate user with email and password."""
+        email = normalize_email(email)
         user = self.db.query(User).filter(User.email == email).first()
         if not user:
             return None
@@ -33,9 +41,10 @@ class AuthService:
 
     def create_user(self, user_data: UserCreate) -> User:
         """Create a new user."""
+        email = normalize_email(user_data.email)
         # Check if user already exists
         existing_user = (
-            self.db.query(User).filter(User.email == user_data.email).first()
+            self.db.query(User).filter(User.email == email).first()
         )
         if existing_user:
             raise HTTPException(
@@ -57,7 +66,7 @@ class AuthService:
         user = User(
             first_name=user_data.first_name,
             last_name=user_data.last_name,
-            email=user_data.email,
+            email=email,
             password_hash=password_hash,
             role=user_data.role,
             facility_id=user_data.facility_id,
@@ -204,7 +213,7 @@ class AuthService:
 
     def get_user_by_email(self, email: str) -> Optional[User]:
         """Get user by email."""
-        return self.db.query(User).filter(User.email == email).first()
+        return self.db.query(User).filter(User.email == normalize_email(email)).first()
 
     def update_user_password(
         self, user_id: int, current_password: str, new_password: str

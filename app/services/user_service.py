@@ -19,6 +19,13 @@ from app.enums import UserRole
 from typing import List, Optional
 
 
+def normalize_email(email: str) -> str:
+    if isinstance(email, str):
+        return email.strip().lower()
+    return email
+
+
+
 class UserService:
     """Service for user management operations."""
 
@@ -36,9 +43,10 @@ class UserService:
         Returns:
             Created user object
         """
+        email = normalize_email(user_data.email)
         # Check if email already exists
         existing_user = (
-            self.db.query(User).filter(User.email == user_data.email).first()
+            self.db.query(User).filter(User.email == email).first()
         )
         if existing_user:
             raise HTTPException(
@@ -77,7 +85,7 @@ class UserService:
         user = User(
             first_name=user_data.first_name,
             last_name=user_data.last_name,
-            email=user_data.email,
+            email=email,
             password_hash=get_password_hash(user_data.password),
             role=user_data.role,
             facility_id=user_data.facility_id,
@@ -95,7 +103,7 @@ class UserService:
 
     def get_user_by_email(self, email: str) -> Optional[User]:
         """Get user by email."""
-        return self.db.query(User).filter(User.email == email).first()
+        return self.db.query(User).filter(User.email == normalize_email(email)).first()
 
     def update_user(
         self, user_id: int, user_update: UserUpdate, updater_id: int
@@ -119,8 +127,9 @@ class UserService:
 
         update_data = user_update.dict(exclude_unset=True)
 
-        # Validate email uniqueness if being updated
+        # Normalize and validate email uniqueness if being updated
         if "email" in update_data:
+            update_data["email"] = normalize_email(update_data["email"])
             existing_user = (
                 self.db.query(User)
                 .filter(and_(User.email == update_data["email"], User.id != user_id))

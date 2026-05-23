@@ -1,10 +1,18 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
+
+
+def normalize_email(value: str) -> str:
+    if isinstance(value, str):
+        return value.strip().lower()
+    return value
 
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+    _normalize_email = validator("email", pre=True, allow_reuse=True)(normalize_email)
 
 
 class Token(BaseModel):
@@ -24,6 +32,8 @@ class UserCreate(BaseModel):
     password: str
     role: Optional[str] = "clinician"
     facility_id: Optional[int] = None
+
+    _normalize_email = validator("email", pre=True, allow_reuse=True)(normalize_email)
 
 
 class UserResponse(BaseModel):
@@ -47,6 +57,8 @@ class PasswordChange(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
+    _normalize_email = validator("email", pre=True, allow_reuse=True)(normalize_email)
+
 
 class ResetPasswordRequest(BaseModel):
     token: str
@@ -60,10 +72,14 @@ class VerifyEmailRequest(BaseModel):
 class ResendVerificationRequest(BaseModel):
     email: EmailStr
 
+    _normalize_email = validator("email", pre=True, allow_reuse=True)(normalize_email)
+
 
 class VerifyCodeRequest(BaseModel):
     code: str
     email: Optional[EmailStr] = None
+
+    _normalize_email = validator("email", pre=True, allow_reuse=True)(normalize_email)
 
 
 class RefreshTokenRequest(BaseModel):

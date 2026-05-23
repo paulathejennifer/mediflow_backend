@@ -1,6 +1,12 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 from datetime import datetime
+
+
+def normalize_email(value: str) -> str:
+    if isinstance(value, str):
+        return value.strip().lower()
+    return value
 
 
 class UserBase(BaseModel):
@@ -11,6 +17,8 @@ class UserBase(BaseModel):
     role: Optional[str] = "clinician"
     facility_id: Optional[int] = None
     is_active: Optional[bool] = True
+
+    _normalize_email = validator("email", pre=True, allow_reuse=True)(normalize_email)
 
 
 class UserCreate(UserBase):
@@ -25,6 +33,8 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     facility_id: Optional[int] = None
     is_active: Optional[bool] = None
+
+    _normalize_email = validator("email", pre=True, allow_reuse=True)(normalize_email)
 
 
 class UserResponse(UserBase):

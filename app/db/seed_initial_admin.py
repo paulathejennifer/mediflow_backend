@@ -42,10 +42,16 @@ def create_initial_super_admin():
         ).decode("utf-8")
 
         if existing_admin:
+            existing_admin.password_hash = hashed_password
+            existing_admin.email = "admin@mediflow.com"
+            existing_admin.is_active = True
+            db.commit()
+            db.refresh(existing_admin)
+
             print("✅ Super admin already exists: admin@mediflow.com")
             print(f"   User ID: {existing_admin.id}")
             print(f"   Role: {existing_admin.role}")
-            print("⚠️  Existing super admin preserved; no password reset performed.")
+            print("⚠️  Existing super admin password has been reset to the default value.")
             return existing_admin
 
         # Create the super admin

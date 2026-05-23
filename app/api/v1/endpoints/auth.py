@@ -158,8 +158,9 @@ async def forgot_password(
     request: ForgotPasswordRequest, db: Session = Depends(get_db)
 ):
     """Request password reset email."""
+    email = request.email.strip().lower()
     # Find user by email
-    user = db.query(User).filter(User.email == request.email).first()
+    user = db.query(User).filter(User.email == email).first()
 
     if not user:
         # Don't reveal if user exists or not for security
@@ -295,8 +296,9 @@ async def resend_verification(
     request: ResendVerificationRequest, db: Session = Depends(get_db)
 ):
     """Resend email verification."""
+    email = request.email.strip().lower()
     # Find user by email
-    user = db.query(User).filter(User.email == request.email).first()
+    user = db.query(User).filter(User.email == email).first()
 
     if not user:
         # Don't reveal if user exists or not for security
@@ -335,8 +337,9 @@ def verify_code(request: VerifyCodeRequest, db: Session = Depends(get_db)):
     # For now, we'll return a success message
 
     if request.email:
+        email = request.email.strip().lower()
         # Find user by email
-        user = db.query(User).filter(User.email == request.email).first()
+        user = db.query(User).filter(User.email == email).first()
         if user:
             # Log verification attempt
             audit_logger = create_audit_logger(db)
