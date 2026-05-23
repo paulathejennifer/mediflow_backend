@@ -25,8 +25,15 @@ echo "Running database migrations..."
 if alembic upgrade head; then
     echo "Migrations complete."
 else
-    echo "WARNING: Migrations failed (non-fatal). The server will still start."
-    echo "  Fix your Alembic migration chain to apply schema changes."
+    echo "WARNING: Alembic migrations failed. Attempting fallback schema creation."
+    python - <<'PY'
+from app.core.database import Base, engine
+print('Creating missing tables via SQLAlchemy metadata...')
+Base.metadata.create_all(bind=engine)
+print('Fallback schema creation complete.')
+PY
+    echo "WARNING: Migrations failed, but fallback create_all was attempted."
+    echo "  Fix your Alembic migration chain to apply schema changes properly."
 fi
 
 # Create upload directory if it doesn't exist
