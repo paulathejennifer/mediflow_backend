@@ -54,12 +54,12 @@ MediFlow is a premium healthcare SaaS platform backend that provides comprehensi
 
 ### AI & Machine Learning
 - **Groq (Llama 3.1 8B)**: Text summarization and reasoning
-- **OpenAI Whisper (Large-v3)**: Speech-to-text transcription
+- **Google Speech Recognition**: Speech-to-text transcription (free, web-based API)
 - **Tesseract OCR**: Document text extraction
 - **pdfplumber & PyMuPDF**: PDF processing
 
 ### File Processing
-- **librosa**: Audio processing for speech recognition
+- **PyAudio**: Audio processing for speech recognition
 - **OpenCV**: Image preprocessing for OCR
 - **Pillow (PIL)**: Image manipulation
 
@@ -179,15 +179,17 @@ MediFlow is a premium healthcare SaaS platform backend that provides comprehensi
 
 ### Authentication (`/api/v1/auth/`)
 ```
-POST /register          # User registration
-POST /login             # User login
-POST /logout            # User logout
-POST /forgot-password   # Password reset request
-POST /reset-password    # Password reset with token
-POST /verify-email      # Email verification
-POST /refresh-token     # Refresh access token
-GET  /me               # Current user info
-POST /change-password  # Change password
+POST /register             # User registration
+POST /login                # User login
+POST /logout               # User logout
+POST /forgot-password      # Password reset request
+POST /reset-password       # Password reset with token
+POST /verify-email         # Email verification
+POST /resend-verification  # Resend verification email
+POST /verify-code          # Verify verification code
+POST /refresh-token        # Refresh access token
+GET  /me                  # Current user info
+POST /change-password     # Change password
 ```
 
 ### Users (`/api/v1/users/`)
@@ -282,6 +284,23 @@ users:
 - email_verified
 - created_at
 - updated_at
+
+password_reset_tokens:
+- id (PK)
+- user_id (FK)
+- token (unique)
+- created_at
+- expires_at
+- is_used
+
+email_verification_tokens:
+- id (PK)
+- user_id (FK)
+- email
+- token (unique)
+- created_at
+- expires_at
+- is_verified
 ```
 
 #### Facilities
@@ -909,7 +928,29 @@ def client(db):
 
 ---
 
-## 📞 Support & Maintenance
+## � Known Issues & Fixes
+
+### Database Compatibility
+
+#### SQLite vs PostgreSQL Function Differences
+**Issue**: The codebase was initially written for PostgreSQL and used PostgreSQL-specific functions like `NOW()`. When using SQLite as the database, this caused errors.
+
+**Error**: `sqlite3.OperationalError) no such function: NOW`
+
+**Fix Applied (May 2026)**:
+- Replaced all instances of `SELECT NOW()` with `SELECT datetime('now')` in `app/api/v1/endpoints/ai.py`
+- Affected endpoints:
+  - `/api/v1/ai/test-summary` (line 110)
+  - `/api/v1/ai/test-transcription` (line 157)
+  - `/api/v1/ai/test-document-extraction` (line 205)
+  - `/api/v1/ai/referral/{referral_id}/summarize` (line 278)
+  - `/api/v1/ai/health` (line 367)
+
+**Recommendation**: When writing raw SQL queries, use SQLAlchemy's `func.now()` for database-agnostic datetime functions, or explicitly check the database dialect and use appropriate functions.
+
+---
+
+## �📞 Support & Maintenance
 
 ### Monitoring & Logging
 - **Application Logs**: Structured logging with ELK stack

@@ -23,6 +23,10 @@ class User(Base):
     facility = relationship("Facility", back_populates="users")
     created_referrals = relationship("Referral", foreign_keys="Referral.created_by", back_populates="creator")
     audit_logs = relationship("AuditLog", back_populates="user")
+    # notifications = relationship("Notification", back_populates="user")  # TODO: Uncomment when notification system is implemented
+    password_reset_tokens = relationship("PasswordResetToken", back_populates="user")
+    email_verification_tokens = relationship("EmailVerificationToken", back_populates="user")
+    refresh_tokens = relationship("RefreshToken", back_populates="user")
 
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

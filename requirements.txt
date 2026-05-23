@@ -25,12 +25,10 @@ aiofiles==23.2.1
 # Text Summarization - Groq (Llama 3.1 8B)
 groq==0.9.0
 
-# Speech-to-Text - Whisper
-openai-whisper==20231117
+# Speech-to-Text - Google Speech Recognition (free, no local dependencies)
+SpeechRecognition==3.10.0
 # Audio processing for speech
-librosa==0.10.1
-soundfile==0.12.1
-numpy==1.24.3
+pyaudio==0.2.13
 
 # Document OCR & PDF Processing
 # Digital PDFs
@@ -57,3 +55,5 @@ flake8==6.1.0
 # Utilities
 python-dateutil==2.8.2
 pytz==2023.3
+
+

@@ -14,50 +14,56 @@ from app.enums import UserRole, AuditAction, DocumentType
 
 router = APIRouter()
 
+
 @router.post("/upload", response_model=DocumentResponse)
-def upload_document(
+async def upload_document(
     referral_id: int,
-    file_type: str = Query(..., description="Type of document (lab_report, discharge_summary, etc.)"),
+    file_type: str = Query(
+        ..., description="Type of document (lab_report, discharge_summary, etc.)"
+    ),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Upload a document for a referral."""
     permission_checker = get_permission_checker(current_user, db)
     permission_checker.check_referral_access(referral_id)
-    
+
     # Validate document type
     if file_type not in [dt.value for dt in DocumentType]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid document type. Must be one of: {[dt.value for dt in DocumentType]}"
+            detail=f"Invalid document type. Must be one of: {[dt.value for dt in DocumentType]}",
         )
-    
+
     # Verify referral exists
     referral = db.query(Referral).filter(Referral.id == referral_id).first()
     if not referral:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Referral not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
         )
-    
+
     try:
         # Handle file upload
         document_handler = DocumentHandler()
-        file_metadata = await document_handler.handle_upload(file, referral_id, current_user.id)
-        
+        file_metadata = await document_handler.handle_upload(
+            file, referral_id, current_user.id
+        )
+
         # Create document record
+        # Remove file_type from metadata as it's the file extension, not document type
+        file_metadata.pop("file_type", None)
         document = ReferralDocument(
             referral_id=referral_id,
             uploaded_by=current_user.id,
             file_type=file_type,
-            **file_metadata
+            **file_metadata,
         )
-        
+
         db.add(document)
         db.commit()
         db.refresh(document)
-        
+
         # Log upload
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
@@ -69,35 +75,39 @@ def upload_document(
                 "referral_id": referral_id,
                 "file_name": file.filename,
                 "file_type": file_type,
-                "file_size": file_metadata["file_size"]
-            }
+                "file_size": file_metadata["file_size"],
+            },
         )
-        
+
         return document
-        
+
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload document: {str(e)}"
+            detail=f"Failed to upload document: {str(e)}",
         )
+
 
 @router.get("/referral/{referral_id}", response_model=List[DocumentSummary])
 def list_referral_documents(
     referral_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """List documents for a referral."""
     permission_checker = get_permission_checker(current_user, db)
     permission_checker.check_referral_access(referral_id)
-    
-    documents = db.query(ReferralDocument).filter(
-        ReferralDocument.referral_id == referral_id
-    ).order_by(ReferralDocument.created_at.desc()).all()
-    
+
+    documents = (
+        db.query(ReferralDocument)
+        .filter(ReferralDocument.referral_id == referral_id)
+        .order_by(ReferralDocument.created_at.desc())
+        .all()
+    )
+
     # Create summaries with uploader names
     result = []
     for doc in documents:
@@ -108,66 +118,260 @@ def list_referral_documents(
             file_type=doc.file_type,
             file_size=doc.file_size,
             created_at=doc.created_at,
-            uploader_name=f"{uploader.first_name} {uploader.last_name}" if uploader else "Unknown"
+            uploader_name=f"{uploader.first_name} {uploader.last_name}"
+            if uploader
+            else "Unknown",
         )
         result.append(summary)
-    
+
     return result
+
+
+@router.get("/facility", response_model=List[DocumentSummary])
+def list_facility_documents(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    """List all documents for the user's facility."""
+    if not current_user.facility_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is not associated with a facility",
+        )
+
+    # Get all referrals for this facility (both from and to)
+    from app.models.referral import Referral
+
+    referrals = (
+        db.query(Referral)
+        .filter(
+            (Referral.from_facility_id == current_user.facility_id)
+            | (Referral.to_facility_id == current_user.facility_id)
+        )
+        .all()
+    )
+
+    referral_ids = [r.id for r in referrals]
+
+    # Get all documents for these referrals
+    documents = (
+        db.query(ReferralDocument)
+        .filter(ReferralDocument.referral_id.in_(referral_ids))
+        .order_by(ReferralDocument.created_at.desc())
+        .all()
+    )
+
+    # Create summaries with uploader names
+    result = []
+    for doc in documents:
+        uploader = db.query(User).filter(User.id == doc.uploaded_by).first()
+        summary = DocumentSummary(
+            id=doc.id,
+            file_name=doc.file_name,
+            file_type=doc.file_type,
+            file_size=doc.file_size,
+            created_at=doc.created_at,
+            uploader_name=f"{uploader.first_name} {uploader.last_name}"
+            if uploader
+            else "Unknown",
+        )
+        result.append(summary)
+
+    return result
+
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 def get_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Get document by ID."""
-    document = db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
+    document = (
+        db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
+    )
     if not document:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
-    
+
     # Check referral access
     permission_checker = get_permission_checker(current_user, db)
     permission_checker.check_referral_access(document.referral_id)
-    
+
     return document
+
+
+@router.post("/{document_id}/transcribe")
+async def transcribe_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Extract text from a document using OCR."""
+    document = (
+        db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
+    )
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
+
+    # Check referral access
+    permission_checker = get_permission_checker(current_user, db)
+    permission_checker.check_referral_access(document.referral_id)
+
+    try:
+        from app.services.document_ai_service import document_ai_service
+
+        # Extract text from document
+        extraction_result = await document_ai_service.extract_text_from_document(
+            document.file_path
+        )
+
+        # Update document with extracted text
+        document.extracted_text = extraction_result.get("text", "")
+        document.ai_processed = True
+        db.commit()
+        db.refresh(document)
+
+        # Log transcription
+        audit_logger = create_audit_logger(db)
+        audit_logger.log_action(
+            user_id=current_user.id,
+            action=AuditAction.UPDATE,
+            entity_type="document",
+            entity_id=document.id,
+            details={
+                "action": "transcribe",
+                "extraction_method": extraction_result.get("extraction_method"),
+                "text_length": extraction_result.get("text_length", 0),
+            },
+        )
+
+        return {
+            "document_id": document.id,
+            "extracted_text": document.extracted_text,
+            "extraction_method": extraction_result.get("extraction_method"),
+            "confidence": extraction_result.get("confidence"),
+            "text_length": len(document.extracted_text),
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to transcribe document: {str(e)}",
+        )
+
+
+@router.post("/{document_id}/summarize")
+async def summarize_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate AI summary for a document."""
+    document = (
+        db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
+    )
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
+
+    # Check referral access
+    permission_checker = get_permission_checker(current_user, db)
+    permission_checker.check_referral_access(document.referral_id)
+
+    if not document.extracted_text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document must be transcribed before summarization",
+        )
+
+    try:
+        from app.services.ai_service import AIService
+        from app.models.referral import Referral
+        from app.models.patient import Patient
+
+        # Get referral and patient context
+        referral = (
+            db.query(Referral).filter(Referral.id == document.referral_id).first()
+        )
+        patient = (
+            db.query(Patient).filter(Patient.id == referral.patient_id).first()
+            if referral
+            else None
+        )
+
+        ai_service = AIService(db)
+
+        # Build context for AI
+        context = {
+            "document_type": document.file_type,
+            "document_text": document.extracted_text,
+            "patient_name": f"{patient.first_name} {patient.last_name}"
+            if patient
+            else "Unknown",
+            "referral_reason": referral.reason_for_referral if referral else "Unknown",
+        }
+
+        # Extract document information
+        summary_result = await ai_service.extract_document_info(context)
+
+        # Store AI summary in a new field or return it
+        # Note: ReferralDocument doesn't have an ai_summary field, so we return it
+        return {
+            "document_id": document.id,
+            "ai_summary": summary_result,
+            "document_type": document.file_type,
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to summarize document: {str(e)}",
+        )
+
 
 @router.delete("/{document_id}")
 def delete_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Delete a document."""
-    document = db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
+    document = (
+        db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
+    )
     if not document:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
-    
+
     # Check permissions - only uploader or admin can delete
     permission_checker = get_permission_checker(current_user, db)
     permission_checker.check_referral_access(document.referral_id)
-    
-    if (document.uploaded_by != current_user.id and 
-        current_user.role not in [UserRole.SUPER_ADMIN, UserRole.FACILITY_ADMIN]):
+
+    if document.uploaded_by != current_user.id and current_user.role not in [
+        UserRole.SUPER_ADMIN,
+        UserRole.FACILITY_ADMIN,
+    ]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only document uploader or admin can delete documents"
+            detail="Only document uploader or admin can delete documents",
         )
-    
+
     try:
         # Delete file from disk
         from app.utils.file_utils import FileUtils
+
         FileUtils.delete_file(document.file_path)
-        
+
         # Delete database record
         db.delete(document)
         db.commit()
-        
+
         # Log deletion
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
@@ -177,15 +381,15 @@ def delete_document(
             entity_id=document.id,
             details={
                 "file_name": document.file_name,
-                "referral_id": document.referral_id
-            }
+                "referral_id": document.referral_id,
+            },
         )
-        
+
         return {"message": "Document deleted successfully"}
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete document: {str(e)}"
+            detail=f"Failed to delete document: {str(e)}",
         )

@@ -4,21 +4,22 @@ from typing import Optional, Tuple
 from fastapi import UploadFile, HTTPException, status
 from app.core.config import settings
 
+
 class FileUtils:
     ALLOWED_DOCUMENT_TYPES = {
-        'application/pdf': 'pdf',
-        'image/jpeg': 'jpg',
-        'image/png': 'png',
-        'text/plain': 'txt',
-        'application/msword': 'doc',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx'
+        "application/pdf": "pdf",
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "text/plain": "txt",
+        "application/msword": "doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
     }
-    
+
     ALLOWED_AUDIO_TYPES = {
-        'audio/mpeg': 'mp3',
-        'audio/wav': 'wav',
-        'audio/m4a': 'm4a',
-        'audio/ogg': 'ogg'
+        "audio/mpeg": "mp3",
+        "audio/wav": "wav",
+        "audio/m4a": "m4a",
+        "audio/ogg": "ogg",
     }
 
     @staticmethod
@@ -27,9 +28,9 @@ class FileUtils:
         if file.content_type not in allowed_types:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File type {file.content_type} not allowed. Allowed types: {list(allowed_types.keys())}"
+                detail=f"File type {file.content_type} not allowed. Allowed types: {list(allowed_types.keys())}",
             )
-        
+
         extension = allowed_types[file.content_type]
         return extension, file.content_type
 
@@ -46,19 +47,19 @@ class FileUtils:
         """Save uploaded file to disk."""
         # Create upload directory if it doesn't exist
         os.makedirs(upload_dir, exist_ok=True)
-        
+
         file_path = os.path.join(upload_dir, filename)
-        
+
         try:
             with open(file_path, "wb") as buffer:
                 content = file.file.read()
                 buffer.write(content)
-            
+
             return file_path
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to save file: {str(e)}"
+                detail=f"Failed to save file: {str(e)}",
             )
         finally:
             file.file.close()
@@ -87,77 +88,83 @@ class FileUtils:
         """Validate file size against maximum allowed size."""
         if max_size is None:
             max_size = settings.MAX_FILE_SIZE
-        
+
         if file_size > max_size:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File size {file_size} exceeds maximum allowed size {max_size}"
+                detail=f"File size {file_size} exceeds maximum allowed size {max_size}",
             )
-        
+
         return True
+
 
 class DocumentHandler(FileUtils):
     """Handler for document uploads."""
-    
+
     def __init__(self, upload_dir: str = None):
         if upload_dir is None:
             upload_dir = os.path.join(settings.UPLOAD_DIR, "documents")
         self.upload_dir = upload_dir
 
-    async def handle_upload(self, file: UploadFile, referral_id: int, uploaded_by: int) -> dict:
+    async def handle_upload(
+        self, file: UploadFile, referral_id: int, uploaded_by: int
+    ) -> dict:
         """Handle document upload and return file metadata."""
         # Validate file type
         extension, mime_type = self.validate_file(file, self.ALLOWED_DOCUMENT_TYPES)
-        
+
         # Generate unique filename
         filename = self.generate_unique_filename(file.filename, extension)
-        
+
         # Save file
         file_path = self.save_uploaded_file(file, self.upload_dir, filename)
-        
+
         # Get file size
         file_size = self.get_file_size(file_path)
-        
+
         # Validate file size
         self.validate_file_size(file_size)
-        
+
         return {
             "file_path": file_path,
             "file_name": filename,
             "file_type": extension,
             "file_size": file_size,
-            "mime_type": mime_type
+            "mime_type": mime_type,
         }
+
 
 class AudioHandler(FileUtils):
     """Handler for audio file uploads."""
-    
+
     def __init__(self, upload_dir: str = None):
         if upload_dir is None:
             upload_dir = os.path.join(settings.UPLOAD_DIR, "audio")
         self.upload_dir = upload_dir
 
-    async def handle_upload(self, file: UploadFile, referral_id: int, uploaded_by: int) -> dict:
+    async def handle_upload(
+        self, file: UploadFile, referral_id: int, uploaded_by: int
+    ) -> dict:
         """Handle audio file upload and return file metadata."""
         # Validate file type
         extension, mime_type = self.validate_file(file, self.ALLOWED_AUDIO_TYPES)
-        
+
         # Generate unique filename
         filename = self.generate_unique_filename(file.filename, extension)
-        
+
         # Save file
         file_path = self.save_uploaded_file(file, self.upload_dir, filename)
-        
+
         # Get file size
         file_size = self.get_file_size(file_path)
-        
+
         # Validate file size (audio files can be larger)
         max_audio_size = settings.MAX_FILE_SIZE * 5  # Allow 5x larger for audio
         self.validate_file_size(file_size, max_audio_size)
-        
+
         return {
             "audio_path": file_path,
             "audio_file_name": filename,
             "audio_file_size": file_size,
-            "mime_type": mime_type
+            "mime_type": mime_type,
         }
