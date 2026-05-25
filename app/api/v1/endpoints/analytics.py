@@ -311,10 +311,10 @@ def get_dashboard_kpis(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User not assigned to a facility"
-        )
-    
+            )
+
     except Exception as e:
-        logger.error(f"Error in get_dashboard_kpis: {str(e)}")
+        logger.exception(f"Error in get_dashboard_kpis: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving dashboard KPIs"
@@ -588,11 +588,8 @@ def get_system_activity_trend(
                     Referral.to_facility_id == facility_id,
                 )
             )
-            
-            # Filter patients by facility
-            patient_query = patient_query.filter(Patient.facility_id == facility_id)
-            
-            # Documents are linked through facility referrals
+
+            # Corrected subquery for referral IDs
             referral_ids = db.query(Referral.id).filter(
                 or_(
                     Referral.from_facility_id == facility_id,
@@ -611,24 +608,23 @@ def get_system_activity_trend(
             
             # Count using database aggregation
             patients_count = patient_query.filter(
-                Patient.created_at >= month_start,
+                patient_query.created_at >= month_start,
                 Patient.created_at < month_end,
             ).count()
             
             referrals_count = referral_query.filter(
                 Referral.created_at >= month_start,
-                Referral.created_at < month_end
+                Referral.created_at < month_end,
             ).count()
             
             documents_count = document_query.filter(
                 ReferralDocument.created_at >= month_start,
-                ReferralDocument.created_at < month_end
+                ReferralDocument.created_at < month_end,
             ).count()
             
             monthly_data.append({
                 "month": month_label,
                 "patients": patients_count,
-                "referrals": referrals_count,
                 "documents": documents_count,
             })
         

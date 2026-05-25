@@ -94,13 +94,21 @@ class NotificationService(NotificationEventCreators):
         limit: int = 50,
     ) -> List[Notification]:
         """Get notifications for a specific user"""
-
-        query = self.db.query(Notification).filter(
+        
+        # Join with delivery to get user-specific read status for broadcast messages
+        query = self.db.query(Notification).outerjoin(
+            NotificationDelivery, 
+            and_(
+                NotificationDelivery.notification_id == Notification.id,
+                NotificationDelivery.user_id == user_id
+            )
+        ).filter(
             or_(
                 Notification.user_id == user_id,
                 and_(
                     Notification.user_id.is_(None),
-                    Notification.roles.contains([user_role]),
+                    # PostgreSQL specific JSON containment check
+                    Notification.roles.cast(Any).contains(user_role),
                 ),
             )
         )
@@ -109,7 +117,16 @@ class NotificationService(NotificationEventCreators):
             query = query.filter(Notification.notification_type == notification_type)
 
         if unread_only:
-            query = query.filter(Notification.is_read == False)
+            # For broadcast, check delivery status. For direct, check is_read.
+            query = query.filter(
+                or_(
+                    and_(Notification.user_id == user_id, Notification.is_read == False),
+                    and_(Notification.user_id.is_(None), or_(
+                        NotificationDelivery.id.is_(None),
+                        NotificationDelivery.delivery_status != "read"
+                    ))
+                )
+            )
 
         # Filter out expired notifications
         query = query.filter(
@@ -123,45 +140,65 @@ class NotificationService(NotificationEventCreators):
 
     def mark_notification_read(self, notification_id: int, user_id: int) -> bool:
         """Mark a notification as read"""
+        notification = self.db.query(Notification).filter(Notification.id == notification_id).first()
+        if not notification:
+            return False
 
-        notification = (
-            self.db.query(Notification)
-            .filter(
-                Notification.id == notification_id,
-                or_(
-                    Notification.user_id == user_id,
-                    and_(
-                        Notification.user_id.is_(None),
-                        Notification.roles.contains([self.get_user_role(user_id)]),
-                    ),
-                ),
-            )
-            .first()
-        )
-
-        if notification:
+        # If it's a direct notification, update the main record
+        if notification.user_id == user_id:
             notification.is_read = True
             notification.read_at = datetime.now(timezone.utc)
-            self.db.commit()
+        
+        # Update or create delivery record to track per-user read state (for broadcasts)
+        delivery = self.db.query(NotificationDelivery).filter(
+            NotificationDelivery.notification_id == notification_id,
+            NotificationDelivery.user_id == user_id
+        ).first()
 
-            # Update delivery tracking
-            delivery = (
-                self.db.query(NotificationDelivery)
-                .filter(
-                    NotificationDelivery.notification_id == notification_id,
-                    NotificationDelivery.user_id == user_id,
-                )
-                .first()
+        if not delivery:
+            delivery = NotificationDelivery(
+                notification_id=notification_id,
+                user_id=user_id,
+                delivery_method="websocket",
+                delivery_status="read",
+                delivered_at=datetime.now(timezone.utc),
+                read_at=datetime.now(timezone.utc)
             )
+            self.db.add(delivery)
+        else:
+            delivery.delivery_status = "read"
+            delivery.read_at = datetime.now(timezone.utc)
 
-            if delivery:
-                delivery.read_at = datetime.now(timezone.utc)
-                delivery.delivery_status = "read"
-                self.db.commit()
+        self.db.commit()
+        return True
 
-            return True
+    def mark_all_as_read(self, user_id: int, user_role: str) -> int:
+        """Mark all relevant notifications for a user as read (powers /read-all)"""
+        notifications = self.get_user_notifications(user_id, user_role, unread_only=True)
+        count = 0
+        for notif in notifications:
+            if self.mark_notification_read(notif.id, user_id):
+                count += 1
+        return count
 
-        return False
+    def handle_notification_action(self, notification_id: int, user_id: int, action_id: str) -> Dict[str, Any]:
+        """Process an action from a notification button (powers /actions/{id})"""
+        notification = self.db.query(Notification).filter(Notification.id == notification_id).first()
+        if not notification:
+            raise ValueError("Notification not found")
+
+        # Log the action in the delivery table
+        delivery = self.db.query(NotificationDelivery).filter(
+            NotificationDelivery.notification_id == notification_id,
+            NotificationDelivery.user_id == user_id
+        ).first()
+
+        if delivery:
+            delivery.action_taken = action_id
+            delivery.read_at = datetime.now(timezone.utc)
+            self.db.commit()
+        
+        return {"status": "success", "action": action_id, "notification_id": notification_id}
 
     def get_user_role(self, user_id: int) -> str:
         """Get user's role"""

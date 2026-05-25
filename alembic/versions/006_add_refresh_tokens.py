@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '006_add_refresh_tokens'
-down_revision = 'add_notification_system'
+down_revision = '005_add_updated_at_columns'
 branch_labels = None
 depends_on = None
 
