@@ -134,18 +134,38 @@ def get_dashboard_kpis(
     - Super Admin: System-wide statistics
     - Facility Admin/Clinician: Facility-specific statistics
     """
+    def calculate_trend(current: int, previous: int) -> float:
+        if previous <= 0:
+            return 100.0 if current > 0 else 0.0
+        return round(((current - previous) / previous) * 100, 1)
+
     try:
         days = 30
         start_date = datetime.utcnow() - timedelta(days=days)
+        prev_start_date = start_date - timedelta(days=days)
         
         if current_user.role == UserRole.SUPER_ADMIN:
             # Super admin sees everything
             total_patients = db.query(Patient).count()
+            
+            # Calculate Patient Trend (Last 30 vs Previous 30)
+            new_patients_current = db.query(Patient).filter(Patient.created_at >= start_date).count()
+            new_patients_prev = db.query(Patient).filter(
+                and_(Patient.created_at >= prev_start_date, Patient.created_at < start_date)
+            ).count()
+            patient_trend = calculate_trend(new_patients_current, new_patients_prev)
+
             total_facilities = db.query(Facility).count()
             total_referrals = db.query(Referral).filter(
                 Referral.created_at >= start_date
             ).count()
             
+            # Calculate Referral Trend
+            total_referrals_prev = db.query(Referral).filter(
+                and_(Referral.created_at >= prev_start_date, Referral.created_at < start_date)
+            ).count()
+            referral_trend = calculate_trend(total_referrals, total_referrals_prev)
+
             # Active referrals (not completed or rejected)
             active_statuses = [
                 ReferralStatus.DRAFT.value,
@@ -184,8 +204,10 @@ def get_dashboard_kpis(
             
             return {
                 "total_patients": total_patients,
+                "total_patients_trend": patient_trend,
                 "total_facilities": total_facilities,
                 "total_referrals_30d": total_referrals,
+                "total_referrals_trend": referral_trend,
                 "active_referrals": active_referrals,
                 "pending_referrals": pending_referrals,
                 "rejection_rate": round(rejection_rate, 2),
@@ -205,6 +227,15 @@ def get_dashboard_kpis(
                 Patient.facility_id == facility_id
             ).count() if hasattr(Patient, 'facility_id') else 0
             
+            # Facility Patient Trend
+            new_patients_current = db.query(Patient).filter(
+                and_(Patient.facility_id == facility_id, Patient.created_at >= start_date)
+            ).count() if hasattr(Patient, 'facility_id') else 0
+            new_patients_prev = db.query(Patient).filter(
+                and_(Patient.facility_id == facility_id, Patient.created_at >= prev_start_date, Patient.created_at < start_date)
+            ).count() if hasattr(Patient, 'facility_id') else 0
+            patient_trend = calculate_trend(new_patients_current, new_patients_prev)
+
             # Referrals for this facility
             facility_referrals = db.query(Referral).filter(
                 and_(
@@ -218,6 +249,16 @@ def get_dashboard_kpis(
             
             total_referrals = facility_referrals.count()
             
+            # Facility Referral Trend
+            total_referrals_prev = db.query(Referral).filter(
+                and_(
+                    or_(Referral.from_facility_id == facility_id, Referral.to_facility_id == facility_id),
+                    Referral.created_at >= prev_start_date,
+                    Referral.created_at < start_date
+                )
+            ).count()
+            referral_trend = calculate_trend(total_referrals, total_referrals_prev)
+
             # Sent from this facility
             sent_referrals = facility_referrals.filter(
                 Referral.from_facility_id == facility_id
@@ -253,7 +294,9 @@ def get_dashboard_kpis(
             return {
                 "facility_name": facility.name if facility else "Unknown",
                 "total_patients": total_patients,
+                "total_patients_trend": patient_trend,
                 "total_referrals_30d": total_referrals,
+                "total_referrals_trend": referral_trend,
                 "sent_referrals_30d": sent_referrals,
                 "received_referrals_30d": received_referrals,
                 "active_referrals": active_referrals,
@@ -526,31 +569,37 @@ def get_system_activity_trend(
         end_date = datetime.utcnow()
         start_date = end_date - timedelta(days=months * 30)
         
+        # Initialize base queries
+        patient_query = db.query(Patient)
+        referral_query = db.query(Referral)
+        document_query = db.query(ReferralDocument)
+
         if current_user.role != UserRole.SUPER_ADMIN and not current_user.facility_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User not assigned to a facility"
             )
-        facility_id = current_user.facility_id
-        referral_query = referral_query.filter(
-            or_(
-                Referral.from_facility_id == facility_id,
-                Referral.to_facility_id == facility_id,
-            )
-        )
-        # Documents are linked through referrals
-        referral_ids = (
-            db.query(Referral.id)
-            .filter(
+
+        if current_user.role != UserRole.SUPER_ADMIN:
+            facility_id = current_user.facility_id
+            referral_query = referral_query.filter(
                 or_(
                     Referral.from_facility_id == facility_id,
                     Referral.to_facility_id == facility_id,
                 )
             )
-        )
-        document_query = document_query.filter(
-            ReferralDocument.referral_id.in_(referral_ids)
-        )
+            
+            # Filter patients by facility
+            patient_query = patient_query.filter(Patient.facility_id == facility_id)
+            
+            # Documents are linked through facility referrals
+            referral_ids = db.query(Referral.id).filter(
+                or_(
+                    Referral.from_facility_id == facility_id,
+                    Referral.to_facility_id == facility_id,
+                )
+            ).subquery()
+            document_query = document_query.filter(ReferralDocument.referral_id.in_(referral_ids))
         
         # Get monthly data for the specified period
         monthly_data = []
@@ -562,18 +611,18 @@ def get_system_activity_trend(
             
             # Count using database aggregation
             patients_count = patient_query.filter(
-                patient_query.created_at >= month_start,
+                Patient.created_at >= month_start,
                 Patient.created_at < month_end,
             ).count()
             
             referrals_count = referral_query.filter(
                 Referral.created_at >= month_start,
-                Referral.created_at < month_end,
+                Referral.created_at < month_end
             ).count()
             
             documents_count = document_query.filter(
                 ReferralDocument.created_at >= month_start,
-                ReferralDocument.created_at < month_end,
+                ReferralDocument.created_at < month_end
             ).count()
             
             monthly_data.append({
