@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.facility import Facility
 from app.services.auth_service import AuthService, get_auth_service
 from app.enums import UserRole, AuditAction
+from app.services.notification_service import get_notification_service
 
 router = APIRouter()
 
@@ -62,6 +63,16 @@ def create_user(
                 "facility_id": user.facility_id,
             },
         )
+
+        # Trigger Role-Based Notifications
+        notif_service = get_notification_service(db)
+        if user.role == UserRole.FACILITY_ADMIN.value:
+            facility = db.query(Facility).filter(Facility.id == user.facility_id).first()
+            notif_service.create_facility_admin_assigned_notification(user, facility)
+        elif user.role == UserRole.CLINICIAN.value:
+            facility = db.query(Facility).filter(Facility.id == user.facility_id).first()
+            if facility:
+                notif_service.create_clinician_created_notification(user, facility)
 
         return user
 

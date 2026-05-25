@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.db.seed_initial_admin import create_initial_super_admin
+from app.tasks.monitoring_jobs import start_monitoring
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -30,6 +31,9 @@ def startup_event():
         create_initial_super_admin()
     except Exception as e:
         print(f"Super admin seed failed: {e}")
+    
+    # Start background monitoring for SA004-SA009
+    start_monitoring()
 
 
 @app.get("/health")

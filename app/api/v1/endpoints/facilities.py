@@ -14,6 +14,7 @@ from app.schemas.facility import (
 from app.models.facility import Facility
 from app.models.user import User
 from app.enums import UserRole, AuditAction
+from app.services.notification_service import get_notification_service
 from app.services.facility_service import FacilityService
 
 router = APIRouter()
@@ -47,6 +48,10 @@ def create_facility(
             entity_id=facility.id,
             details={"name": facility.name, "code": facility.facility_code},
         )
+
+        # Notify Super Admins
+        notif_service = get_notification_service(db)
+        notif_service.create_facility_created_notification(facility, current_user.id)
 
         return facility
     except HTTPException:
@@ -197,6 +202,11 @@ def deactivate_facility(
             entity_id=facility.id,
             details={"action": "deactivate", "name": facility.name},
         )
+
+        # Notify Super Admins
+        notif_service = get_notification_service(db)
+        # Passing False as old_status for notification logic
+        notif_service.create_facility_status_changed_notification(facility, True, "Manual deactivation")
 
         return {"message": "Facility deactivated successfully"}
     except Exception as e:

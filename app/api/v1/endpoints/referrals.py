@@ -17,6 +17,7 @@ from app.models.patient import Patient
 from app.models.facility import Facility
 from app.models.user import User
 from app.enums import UserRole, AuditAction, ReferralStatus, Priority
+from app.services.notification_service import get_notification_service
 
 router = APIRouter()
 
@@ -106,6 +107,12 @@ def create_referral(
                 "priority": referral.priority,
             },
         )
+
+        # SA001: Trigger notification for urgent/emergency drafts
+        # While clinicians usually check the dashboard, emergency drafts
+        # require immediate visibility.
+        if referral.priority == Priority.EMERGENCY.value:
+            get_notification_service(db).create_incoming_referral_notification(referral)
 
         return referral
 
@@ -336,6 +343,10 @@ def submit_referral(
             entity_id=referral.id,
             details={"action": "submit", "status": ReferralStatus.SUBMITTED},
         )
+
+        # FA001: Notify receiving facility clinicians of new incoming referral
+        notif_service = get_notification_service(db)
+        notif_service.create_incoming_referral_notification(referral)
 
         return {"message": "Referral submitted successfully"}
 
