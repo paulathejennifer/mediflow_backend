@@ -1025,6 +1025,7 @@ def get_api_requests(
             and_(
                 Patient.created_at >= previous_start,
                 Patient.created_at < previous_end
+            )
         ).scalar() or 0
         previous_documents = db.query(func.count(ReferralDocument.id)).filter(
             and_(
