@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
 
     # Frontend Configuration
-    FRONTEND_URL: str = "http://localhost:3000"
+    FRONTEND_URL: str = "https://mediflow-frontend-jor1ipuvr.vercel.app/"
 
     # Refresh Token Configuration
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7

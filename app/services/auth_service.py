@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+import logging
 from fastapi import HTTPException, status, Depends
 from app.models.user import User
 from app.models.refresh_token import RefreshToken
@@ -103,14 +105,28 @@ class AuthService:
             data={"sub": str(user.id), "token": refresh_token_string}
         )
 
-        # Store refresh token in database
+        # Store refresh token in database (guard DB errors so internals aren't leaked)
         refresh_token = RefreshToken(
             user_id=user.id,
             token=refresh_token_string,
             expires_at=datetime.utcnow() + timedelta(days=7),
         )
-        self.db.add(refresh_token)
-        self.db.commit()
+        try:
+            self.db.add(refresh_token)
+            self.db.commit()
+        except SQLAlchemyError as e:
+            # Log full exception server-side and raise generic error to client
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to store refresh token for user_id=%s", user.id)
+            # Rollback to keep session usable
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal server error",
+            )
 
         return {
             "access_token": access_token,
