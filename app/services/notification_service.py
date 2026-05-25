@@ -26,12 +26,13 @@ from app.models.patient import Patient
 from app.models.audit_log import AuditLog
 from app.websocket.manager import notification_broadcaster
 from app.core.security import get_password_hash
-from app.enums import ReferralStatus, UserRole, AuditAction
+from app.enums import ReferralStatus, UserRole, AuditAction, Priority
+from app.services.notification_events import NotificationEventCreators
 
 logger = logging.getLogger(__name__)
 
 
-class NotificationService:
+class NotificationService(NotificationEventCreators):
     """Core notification service"""
 
     def __init__(self, db: Session):
