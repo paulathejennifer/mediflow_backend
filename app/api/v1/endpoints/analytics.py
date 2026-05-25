@@ -145,67 +145,58 @@ def get_dashboard_kpis(
             total_referrals = db.query(Referral).filter(
                 Referral.created_at >= start_date
             ).count()
-        
-        # Active referrals (not completed or rejected)
-        active_statuses = [
-            ReferralStatus.DRAFT.value,
-            ReferralStatus.SUBMITTED.value,
-            ReferralStatus.ACCEPTED.value,
-            ReferralStatus.IN_TRANSIT.value,
-            ReferralStatus.RECEIVED.value,
-        ]
-        active_referrals = referral_query.filter(
-            Referral.status.in_(active_statuses)
-        ).count()
-        
-        # Pending referrals (submitted but not yet accepted/rejected)
-        pending_referrals = referral_query.filter(
-            Referral.status == ReferralStatus.SUBMITTED.value
-        ).count()
-        
-        # Rejection rate
-        total_with_outcome = referral_query.filter(
-            Referral.status.in_([
-                ReferralStatus.COMPLETED.value,
-                ReferralStatus.REJECTED.value,
-            ])
-        ).count()
-        rejected_count = referral_query.filter(
-            Referral.status == ReferralStatus.REJECTED.value
-        ).count()
-        rejection_rate = (
-            (rejected_count / max(total_with_outcome, 1)) * 100
-        ) if total_with_outcome > 0 else 0
-        
-        # System utilization (referrals per facility)
-        avg_referrals_per_facility = (
-            total_referrals / max(total_facilities, 1)
-        )
-        
-        return {
-            "total_patients": total_patients,
-            "total_facilities": total_facilities,
-            "total_referrals_30d": total_referrals,
-            "active_referrals": active_referrals,
-            "pending_referrals": pending_referrals,
-            "rejection_rate": round(rejection_rate, 2),
-            "avg_referrals_per_facility": round(avg_referrals_per_facility, 1),
-            "system_utilization_percent": min(
-                round((total_referrals / max(total_facilities * 100, 1)) * 100, 1),
-                100
-            ),
-        }
-    
-        else:
+            
+            # Active referrals (not completed or rejected)
+            active_statuses = [
+                ReferralStatus.DRAFT.value,
+                ReferralStatus.SUBMITTED.value,
+                ReferralStatus.ACCEPTED.value,
+                ReferralStatus.IN_TRANSIT.value,
+                ReferralStatus.RECEIVED.value,
+            ]
+            active_referrals = db.query(Referral).filter(
+                Referral.status.in_(active_statuses)
+            ).count()
+            
+            # Pending referrals (submitted but not yet accepted/rejected)
+            pending_referrals = db.query(Referral).filter(
+                Referral.status == ReferralStatus.SUBMITTED.value
+            ).count()
+            
+            # Rejection rate
+            total_with_outcome = db.query(Referral).filter(
+                Referral.status.in_([
+                    ReferralStatus.COMPLETED.value,
+                    ReferralStatus.REJECTED.value,
+                ])
+            ).count()
+            rejected_count = db.query(Referral).filter(
+                Referral.status == ReferralStatus.REJECTED.value
+            ).count()
+            rejection_rate = (
+                (rejected_count / max(total_with_outcome, 1)) * 100
+            ) if total_with_outcome > 0 else 0
+            
+            # System utilization (referrals per facility)
+            avg_referrals_per_facility = (
+                total_referrals / max(total_facilities, 1)
+            )
+            
             return {
-                "error": "User not assigned to a facility",
-                "total_patients": 0,
-                "total_referrals_30d": 0,
-                "active_referrals": 0,
-                "pending_referrals": 0,
+                "total_patients": total_patients,
+                "total_facilities": total_facilities,
+                "total_referrals_30d": total_referrals,
+                "active_referrals": active_referrals,
+                "pending_referrals": pending_referrals,
+                "rejection_rate": round(rejection_rate, 2),
+                "avg_referrals_per_facility": round(avg_referrals_per_facility, 1),
+                "system_utilization_percent": min(
+                    round((total_referrals / max(total_facilities * 100, 1)) * 100, 1),
+                    100
+                ),
             }
-    
-    elif current_user.facility_id:
+        
+        elif current_user.facility_id:
         # Facility-based user (Facility Admin or Clinician)
         facility_id = current_user.facility_id
         
