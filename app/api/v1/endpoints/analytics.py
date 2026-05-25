@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
+import logging
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
@@ -12,6 +13,8 @@ from app.models.referral_document import ReferralDocument
 from app.enums import UserRole, ReferralStatus, Priority
 from sqlalchemy import and_, or_, func, extract, case
 from sqlalchemy.sql import label
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -35,17 +38,10 @@ def get_referral_analytics(
     
     if current_user.role != UserRole.SUPER_ADMIN:
         if not current_user.facility_id:
-            return {
-                "error": "User not assigned to a facility",
-                "period_days": days,
-                "total_referrals": 0,
-                "sent_referrals": 0,
-                "received_referrals": 0,
-                "status_breakdown": {},
-                "priority_breakdown": {},
-                "avg_processing_time_hours": 0,
-                "acceptance_rate": 0,
-            }
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User not assigned to a facility"
+            )
         
         # Filter by user's facility (sender or receiver)
         base_query = base_query.filter(
@@ -135,23 +131,20 @@ def get_dashboard_kpis(
     Get dashboard KPIs for the current user.
     
     Returns key metrics for dashboard display.
+    - Super Admin: System-wide statistics
+    - Facility Admin/Clinician: Facility-specific statistics
     """
-    # Get last 30 days of data
-    days = 30
-    start_date = datetime.utcnow() - timedelta(days=days)
-    
-    # Build base query based on user role
-    referral_query = db.query(Referral)
-    patient_query = db.query(Patient)
-    facility_query = db.query(Facility)
-    
-    if current_user.role == UserRole.SUPER_ADMIN:
-        # Super admin sees everything
-        total_patients = patient_query.count()
-        total_facilities = facility_query.count()
-        total_referrals = referral_query.filter(
-            Referral.created_at >= start_date
-        ).count()
+    try:
+        days = 30
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        if current_user.role == UserRole.SUPER_ADMIN:
+            # Super admin sees everything
+            total_patients = db.query(Patient).count()
+            total_facilities = db.query(Facility).count()
+            total_referrals = db.query(Referral).filter(
+                Referral.created_at >= start_date
+            ).count()
         
         # Active referrals (not completed or rejected)
         active_statuses = [
@@ -203,22 +196,26 @@ def get_dashboard_kpis(
             ),
         }
     
+        else:
+            return {
+                "error": "User not assigned to a facility",
+                "total_patients": 0,
+                "total_referrals_30d": 0,
+                "active_referrals": 0,
+                "pending_referrals": 0,
+            }
+    
     elif current_user.facility_id:
-        # Facility-based user
+        # Facility-based user (Facility Admin or Clinician)
         facility_id = current_user.facility_id
         
-        # Patients from this facility
-        total_patients = patient_query.join(
-            # Assuming there's a relationship through patient_identifiers
-        ).filter(
-            # Filter by facility - adjust based on actual schema
-        ).count()
-        
-        # For simplicity, count all patients (facility isolation happens at service layer)
-        total_patients = patient_query.count()
+        # Patients from this facility ONLY
+        total_patients = db.query(Patient).filter(
+            Patient.facility_id == facility_id
+        ).count() if hasattr(Patient, 'facility_id') else 0
         
         # Referrals for this facility
-        facility_referrals = referral_query.filter(
+        facility_referrals = db.query(Referral).filter(
             and_(
                 or_(
                     Referral.from_facility_id == facility_id,
@@ -258,7 +255,7 @@ def get_dashboard_kpis(
         ).count()
         
         # This facility's info
-        facility = facility_query.filter(
+        facility = db.query(Facility).filter(
             Facility.id == facility_id
         ).first()
         
@@ -271,20 +268,23 @@ def get_dashboard_kpis(
             "active_referrals": active_referrals,
             "pending_referrals": pending_referrals,
             "facility_utilization_percent": min(
-                round((total_referrals / 100) * 100, 1),  # Assuming 100 referrals is 100% capacity
+                round((total_referrals / 100) * 100, 1),
                 100
             ),
         }
-    
     else:
         # User without facility
-        return {
-            "error": "User not assigned to a facility",
-            "total_patients": 0,
-            "total_referrals_30d": 0,
-            "active_referrals": 0,
-            "pending_referrals": 0,
-        }
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User not assigned to a facility"
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in get_dashboard_kpis: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving dashboard KPIs"
+        )
 
 
 @router.get("/referrals/by-status")
@@ -295,46 +295,59 @@ def get_referrals_by_status(
     """Get referrals grouped by status for pie chart visualization.
     
     Only shows key workflow statuses: submitted, accepted, in_transit, completed.
-    Draft, received, and rejected statuses are excluded from the visualization.
     """
-    query = db.query(Referral)
-    
-    if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
-        query = query.filter(
-            or_(
-                Referral.from_facility_id == current_user.facility_id,
-                Referral.to_facility_id == current_user.facility_id,
+    try:
+        query = db.query(Referral)
+        
+        if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
+            query = query.filter(
+                or_(
+                    Referral.from_facility_id == current_user.facility_id,
+                    Referral.to_facility_id == current_user.facility_id,
+                )
             )
+        elif current_user.role != UserRole.SUPER_ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User not assigned to a facility"
+            )
+        
+        # Only show key workflow statuses
+        display_statuses = [
+            ReferralStatus.SUBMITTED,
+            ReferralStatus.ACCEPTED,
+            ReferralStatus.IN_TRANSIT,
+            ReferralStatus.COMPLETED,
+        ]
+        
+        # Map backend status to display names
+        status_display_map = {
+            "submitted": "submitted",
+            "accepted": "accepted",
+            "in_transit": "in_progress",
+            "completed": "completed",
+        }
+        
+        status_counts = {}
+        for status in display_statuses:
+            count = query.filter(Referral.status == status.value).count()
+            if count > 0:
+                display_name = status_display_map.get(status.value, status.value)
+                status_counts[display_name] = count
+        
+        return {
+            "labels": list(status_counts.keys()),
+            "data": list(status_counts.values()),
+            "total": sum(status_counts.values()),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_referrals_by_status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving referrals by status"
         )
-    
-    # Only show key workflow statuses
-    display_statuses = [
-        ReferralStatus.SUBMITTED,
-        ReferralStatus.ACCEPTED,
-        ReferralStatus.IN_TRANSIT,
-        ReferralStatus.COMPLETED,
-    ]
-    
-    # Map backend status to display names
-    status_display_map = {
-        "submitted": "submitted",
-        "accepted": "accepted",
-        "in_transit": "in_progress",
-        "completed": "completed",
-    }
-    
-    status_counts = {}
-    for status in display_statuses:
-        count = query.filter(Referral.status == status.value).count()
-        if count > 0:
-            display_name = status_display_map.get(status.value, status.value)
-            status_counts[display_name] = count
-    
-    return {
-        "labels": list(status_counts.keys()),
-        "data": list(status_counts.values()),
-        "total": sum(status_counts.values()),
-    }
 
 
 @router.get("/referrals/by-priority")
@@ -343,27 +356,41 @@ def get_referrals_by_priority(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get referrals grouped by priority for chart visualization."""
-    query = db.query(Referral)
-    
-    if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
-        query = query.filter(
-            or_(
-                Referral.from_facility_id == current_user.facility_id,
-                Referral.to_facility_id == current_user.facility_id,
+    try:
+        query = db.query(Referral)
+        
+        if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
+            query = query.filter(
+                or_(
+                    Referral.from_facility_id == current_user.facility_id,
+                    Referral.to_facility_id == current_user.facility_id,
+                )
             )
+        elif current_user.role != UserRole.SUPER_ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User not assigned to a facility"
+            )
+        
+        priority_counts = {}
+        for priority in Priority:
+            count = query.filter(Referral.priority == priority.value).count()
+            if count > 0:
+                priority_counts[priority.value] = count
+        
+        return {
+            "labels": list(priority_counts.keys()),
+            "data": list(priority_counts.values()),
+            "total": sum(priority_counts.values()),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_referrals_by_priority: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving referrals by priority"
         )
-    
-    priority_counts = {}
-    for priority in Priority:
-        count = query.filter(Referral.priority == priority.value).count()
-        if count > 0:
-            priority_counts[priority.value] = count
-    
-    return {
-        "labels": list(priority_counts.keys()),
-        "data": list(priority_counts.values()),
-        "total": sum(priority_counts.values()),
-    }
 
 
 @router.get("/referrals/trend")
@@ -373,48 +400,79 @@ def get_referral_trend(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get referral trend over time for line chart visualization."""
-    end_date = datetime.utcnow()
-    start_date = end_date - timedelta(days=days)
-    
-    query = db.query(Referral)
-    
-    if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
-        query = query.filter(
-            and_(
-                or_(
-                    Referral.from_facility_id == current_user.facility_id,
-                    Referral.to_facility_id == current_user.facility_id,
-                ),
+    try:
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=days)
+        
+        query = db.query(Referral)
+        
+        if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
+            query = query.filter(
+                and_(
+                    or_(
+                        Referral.from_facility_id == current_user.facility_id,
+                        Referral.to_facility_id == current_user.facility_id,
+                    ),
+                    Referral.created_at >= start_date,
+                    Referral.created_at <= end_date,
+                )
+            )
+        else:
+            query = query.filter(
                 Referral.created_at >= start_date,
                 Referral.created_at <= end_date,
             )
+        
+        if current_user.role != UserRole.SUPER_ADMIN and not current_user.facility_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User not assigned to a facility"
+            )
+        
+        # Group by date using database aggregation
+        daily_counts = {}
+        for i in range(days):
+            date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+            daily_counts[date] = 0
+        
+        # Query aggregated daily counts
+        daily_data = db.query(
+            func.date(Referral.created_at).label("date"),
+            func.count(Referral.id).label("count")
+        ).filter(
+            and_(
+                Referral.created_at >= start_date,
+                Referral.created_at <= end_date
+            )
         )
-    else:
-        query = query.filter(
-            Referral.created_at >= start_date,
-            Referral.created_at <= end_date,
+        
+        if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
+            daily_data = daily_data.filter(
+                or_(
+                    Referral.from_facility_id == current_user.facility_id,
+                    Referral.to_facility_id == current_user.facility_id,
+                )
+            )
+        
+        for date, count in daily_data.group_by(func.date(Referral.created_at)).all():
+            date_str = date.strftime("%Y-%m-%d")
+            if date_str in daily_counts:
+                daily_counts[date_str] = count
+        
+        return {
+            "labels": list(daily_counts.keys()),
+            "data": list(daily_counts.values()),
+            "total": sum(daily_counts.values()),
+            "average_per_day": round(sum(daily_counts.values()) / max(days, 1), 2),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_referral_trend: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving referral trend"
         )
-    
-    # Group by date
-    referrals = query.order_by(Referral.created_at).all()
-    
-    # Create daily counts
-    daily_counts = {}
-    for i in range(days):
-        date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
-        daily_counts[date] = 0
-    
-    for referral in referrals:
-        date = referral.created_at.strftime("%Y-%m-%d")
-        if date in daily_counts:
-            daily_counts[date] += 1
-    
-    return {
-        "labels": list(daily_counts.keys()),
-        "data": list(daily_counts.values()),
-        "total": sum(daily_counts.values()),
-        "average_per_day": round(sum(daily_counts.values()) / max(days, 1), 2),
-    }
 
 
 @router.get("/facilities/top-referring")
@@ -424,40 +482,46 @@ def get_top_referring_facilities(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get top referring facilities for bar chart visualization."""
-    # Only super admin can see all facilities
-    if current_user.role != UserRole.SUPER_ADMIN:
-        return {
-            "error": "Only super admin can view this analytics",
-            "labels": [],
-            "data": [],
-        }
+    try:
+        # Only super admin can see all facilities
+        if current_user.role != UserRole.SUPER_ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only super admin can view this analytics"
+            )
     
-    # Count referrals by from_facility
-    facility_counts = (
-        db.query(
-            Referral.from_facility_id,
-            func.count(Referral.id).label("referral_count"),
+        # Count referrals by from_facility using aggregation
+        facility_counts = (
+            db.query(
+                Referral.from_facility_id,
+                func.count(Referral.id).label("referral_count"),
+            )
+            .group_by(Referral.from_facility_id)
+            .order_by(func.count(Referral.id).desc())
+            .limit(limit)
+            .all()
         )
-        .group_by(Referral.from_facility_id)
-        .order_by(func.count(Referral.id).desc())
-        .limit(limit)
-        .all()
-    )
-    
-    labels = []
-    data = []
-    
-    for facility_id, count in facility_counts:
-        facility = db.query(Facility).filter(Facility.id == facility_id).first()
-        if facility:
-            labels.append(facility.name)
-            data.append(count)
-    
-    return {
-        "labels": labels,
-        "data": data,
-        "total_referrals": sum(data),
-    }
+        
+        labels = []
+        data = []
+        
+        for facility_id, count in facility_counts:
+            facility = db.query(Facility).filter(Facility.id == facility_id).first()
+            if facility:
+                labels.append(facility.name)
+                data.append(count)
+        
+        return {
+            "labels": labels,
+            "data": data,
+            "total_referrals": sum(data),
+        }
+    except Exception as e:
+        logger.error(f"Error in get_top_referring_facilities: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving facility analytics"
+        )
 
 
 @router.get("/system-activity")
@@ -467,15 +531,15 @@ def get_system_activity_trend(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get system activity trend over months for combined chart visualization."""
-    end_date = datetime.utcnow()
-    start_date = end_date - timedelta(days=months * 30)
-    
-    # Build base queries based on user role
-    referral_query = db.query(Referral)
-    patient_query = db.query(Patient)
-    document_query = db.query(ReferralDocument)
-    
-    if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
+    try:
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=months * 30)
+        
+        if current_user.role != UserRole.SUPER_ADMIN and not current_user.facility_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User not assigned to a facility"
+            )
         facility_id = current_user.facility_id
         referral_query = referral_query.filter(
             or_(
@@ -496,44 +560,50 @@ def get_system_activity_trend(
         document_query = document_query.filter(
             ReferralDocument.referral_id.in_(referral_ids)
         )
-    
-    # Get monthly data for the specified period
-    monthly_data = []
-    for i in range(months, 0, -1):
-        month_start = end_date - timedelta(days=i * 30)
-        month_end = end_date - timedelta(days=(i - 1) * 30)
         
-        month_label = month_start.strftime("%b")
+        # Get monthly data for the specified period
+        monthly_data = []
+        for i in range(months, 0, -1):
+            month_start = end_date - timedelta(days=i * 30)
+            month_end = end_date - timedelta(days=(i - 1) * 30)
+            
+            month_label = month_start.strftime("%b")
+            
+            # Count using database aggregation
+            patients_count = patient_query.filter(
+                patient_query.created_at >= month_start,
+                Patient.created_at < month_end,
+            ).count()
+            
+            referrals_count = referral_query.filter(
+                Referral.created_at >= month_start,
+                Referral.created_at < month_end,
+            ).count()
+            
+            documents_count = document_query.filter(
+                ReferralDocument.created_at >= month_start,
+                ReferralDocument.created_at < month_end,
+            ).count()
+            
+            monthly_data.append({
+                "month": month_label,
+                "patients": patients_count,
+                "referrals": referrals_count,
+                "documents": documents_count,
+            })
         
-        # Count patients created in this month
-        patients_count = patient_query.filter(
-            Patient.created_at >= month_start,
-            Patient.created_at < month_end,
-        ).count()
-        
-        # Count referrals created in this month
-        referrals_count = referral_query.filter(
-            Referral.created_at >= month_start,
-            Referral.created_at < month_end,
-        ).count()
-        
-        # Count documents created in this month
-        documents_count = document_query.filter(
-            ReferralDocument.created_at >= month_start,
-            ReferralDocument.created_at < month_end,
-        ).count()
-        
-        monthly_data.append({
-            "month": month_label,
-            "patients": patients_count,
-            "referrals": referrals_count,
-            "documents": documents_count,
-        })
-    
-    return {
-        "data": monthly_data,
-        "period_months": months,
-    }
+        return {
+            "data": monthly_data,
+            "period_months": months,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_system_activity_trend: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving system activity trend"
+        )
 
 
 @router.get("/referrals/volume")
@@ -543,60 +613,73 @@ def get_referral_volume(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get referral volume by month (incoming vs outgoing) for bar chart visualization."""
-    end_date = datetime.utcnow()
-    
-    # Build base query based on user role
-    query = db.query(Referral)
-    
-    if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
-        facility_id = current_user.facility_id
-        query = query.filter(
-            or_(
-                Referral.from_facility_id == facility_id,
-                Referral.to_facility_id == facility_id,
+    try:
+        if current_user.role != UserRole.SUPER_ADMIN and not current_user.facility_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User not assigned to a facility"
             )
-        )
-    
-    monthly_data = []
-    for i in range(months, 0, -1):
-        month_start = end_date - timedelta(days=i * 30)
-        month_end = end_date - timedelta(days=(i - 1) * 30)
         
-        month_label = month_start.strftime("%b")
+        end_date = datetime.utcnow()
+        query = db.query(Referral)
         
-        if current_user.role == UserRole.SUPER_ADMIN:
-            # For super admin, count all referrals as "total"
-            total_count = query.filter(
-                Referral.created_at >= month_start,
-                Referral.created_at < month_end,
-            ).count()
-            monthly_data.append({
-                "month": month_label,
-                "total": total_count,
-            })
-        else:
-            # For facility users, distinguish incoming vs outgoing
+        if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
             facility_id = current_user.facility_id
-            outgoing_count = query.filter(
-                Referral.from_facility_id == facility_id,
-                Referral.created_at >= month_start,
-                Referral.created_at < month_end,
-            ).count()
-            incoming_count = query.filter(
-                Referral.to_facility_id == facility_id,
-                Referral.created_at >= month_start,
-                Referral.created_at < month_end,
-            ).count()
-            monthly_data.append({
-                "month": month_label,
-                "incoming": incoming_count,
-                "outgoing": outgoing_count,
-            })
-    
-    return {
-        "data": monthly_data,
-        "period_months": months,
-    }
+            query = query.filter(
+                or_(
+                    Referral.from_facility_id == facility_id,
+                    Referral.to_facility_id == facility_id,
+                )
+            )
+        
+        monthly_data = []
+        for i in range(months, 0, -1):
+            month_start = end_date - timedelta(days=i * 30)
+            month_end = end_date - timedelta(days=(i - 1) * 30)
+            
+            month_label = month_start.strftime("%b")
+            
+            if current_user.role == UserRole.SUPER_ADMIN:
+                # For super admin, count all referrals as "total"
+                total_count = query.filter(
+                    Referral.created_at >= month_start,
+                    Referral.created_at < month_end,
+                ).count()
+                monthly_data.append({
+                    "month": month_label,
+                    "total": total_count,
+                })
+            else:
+                # For facility users, distinguish incoming vs outgoing
+                facility_id = current_user.facility_id
+                outgoing_count = query.filter(
+                    Referral.from_facility_id == facility_id,
+                    Referral.created_at >= month_start,
+                    Referral.created_at < month_end,
+                ).count()
+                incoming_count = query.filter(
+                    Referral.to_facility_id == facility_id,
+                    Referral.created_at >= month_start,
+                    Referral.created_at < month_end,
+                ).count()
+                monthly_data.append({
+                    "month": month_label,
+                    "incoming": incoming_count,
+                    "outgoing": outgoing_count,
+                })
+        
+        return {
+            "data": monthly_data,
+            "period_months": months,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_referral_volume: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving referral volume"
+        )
 
 
 @router.get("/referrals/turnaround-time")
@@ -606,54 +689,69 @@ def get_turnaround_time_trend(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get average turnaround time by week for line chart visualization."""
-    end_date = datetime.utcnow()
-    
-    # Build base query based on user role
-    query = db.query(Referral)
-    
-    if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
-        facility_id = current_user.facility_id
-        query = query.filter(
-            or_(
-                Referral.from_facility_id == facility_id,
-                Referral.to_facility_id == facility_id,
+    try:
+        if current_user.role != UserRole.SUPER_ADMIN and not current_user.facility_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User not assigned to a facility"
             )
+        
+        end_date = datetime.utcnow()
+        query = db.query(Referral)
+        
+        if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
+            facility_id = current_user.facility_id
+            query = query.filter(
+                or_(
+                    Referral.from_facility_id == facility_id,
+                    Referral.to_facility_id == facility_id,
+                )
+            )
+        
+        weekly_data = []
+        for i in range(weeks, 0, -1):
+            week_start = end_date - timedelta(weeks=i)
+            week_end = end_date - timedelta(weeks=i-1)
+            
+            week_label = f"Week {weeks - i + 1}"
+            
+            # Get average turnaround using database aggregation
+            avg_turnaround = db.query(
+                func.avg(
+                    case(
+                        (
+                            and_(
+                                Referral.updated_at.isnot(None),
+                                Referral.created_at.isnot(None)
+                            ),
+                            extract('epoch', Referral.updated_at - Referral.created_at) / 86400
+                        ),
+                        else_=None
+                    )
+                )
+            ).filter(
+                Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]),
+                Referral.created_at >= week_start,
+                Referral.created_at < week_end,
+            ).scalar() or 0
+            
+            weekly_data.append({
+                "week": week_label,
+                "days": round(avg_turnaround, 1),
+            })
+        
+        return {
+            "data": weekly_data,
+            "period_weeks": weeks,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_turnaround_time_trend: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving turnaround time trend"
         )
-    
-    weekly_data = []
-    for i in range(weeks, 0, -1):
-        week_start = end_date - timedelta(weeks=i)
-        week_end = end_date - timedelta(weeks=i-1)
-        
-        week_label = f"Week {weeks - i + 1}"
-        
-        # Get completed referrals in this week
-        completed_referrals = query.filter(
-            Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]),
-            Referral.created_at >= week_start,
-            Referral.created_at < week_end,
-        ).all()
-        
-        # Calculate average turnaround time
-        turnaround_times = []
-        for referral in completed_referrals:
-            if referral.updated_at and referral.created_at:
-                time_diff = (referral.updated_at - referral.created_at).total_seconds() / 86400  # days
-                turnaround_times.append(time_diff)
-        
-        avg_turnaround = 0
-        if turnaround_times:
-            avg_turnaround = round(sum(turnaround_times) / len(turnaround_times), 1)
-        
-        weekly_data.append({
-            "week": week_label,
-            "days": avg_turnaround,
-        })
-    
-    return {
-        "data": weekly_data,
-        "period_weeks": weeks,
-    }
 
 
 @router.get("/referrals/by-reason")
@@ -662,45 +760,60 @@ def get_referrals_by_reason(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get referrals grouped by reason for chart visualization."""
-    # Build base query based on user role
-    query = db.query(Referral)
-    
-    if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
-        facility_id = current_user.facility_id
-        query = query.filter(
-            or_(
-                Referral.from_facility_id == facility_id,
-                Referral.to_facility_id == facility_id,
+    try:
+        if current_user.role != UserRole.SUPER_ADMIN and not current_user.facility_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User not assigned to a facility"
             )
-        )
-    
-    # Get all referrals and group by reason
-    referrals = query.all()
-    reason_counts = {}
-    
-    for referral in referrals:
-        reason = referral.reason_for_referral
-        if not reason or reason.strip() == "":
-            reason = "Not Specified"
-        else:
-            # Normalize the reason (take first line, truncate if too long)
-            reason = reason.split("\n")[0].strip()
-            if len(reason) > 50:
-                reason = reason[:47] + "..."
         
-        reason_counts[reason] = reason_counts.get(reason, 0) + 1
-    
-    # Sort by count and take top 10
-    sorted_reasons = sorted(reason_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-    
-    labels = [reason for reason, count in sorted_reasons]
-    data = [count for reason, count in sorted_reasons]
-    
-    return {
-        "labels": labels,
-        "data": data,
-        "total": sum(data),
-    }
+        # Build base query based on user role
+        query = db.query(Referral)
+        
+        if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
+            facility_id = current_user.facility_id
+            query = query.filter(
+                or_(
+                    Referral.from_facility_id == facility_id,
+                    Referral.to_facility_id == facility_id,
+                )
+            )
+        
+        # Get all referrals and group by reason
+        referrals = query.all()
+        reason_counts = {}
+        
+        for referral in referrals:
+            reason = referral.reason_for_referral
+            if not reason or reason.strip() == "":
+                reason = "Not Specified"
+            else:
+                # Normalize the reason (take first line, truncate if too long)
+                reason = reason.split("\n")[0].strip()
+                if len(reason) > 50:
+                    reason = reason[:47] + "..."
+            
+            reason_counts[reason] = reason_counts.get(reason, 0) + 1
+        
+        # Sort by count and take top 10
+        sorted_reasons = sorted(reason_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        labels = [reason for reason, count in sorted_reasons]
+        data = [count for reason, count in sorted_reasons]
+        
+        return {
+            "labels": labels,
+            "data": data,
+            "total": sum(data),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_referrals_by_reason: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving referrals by reason"
+        )
 
 
 @router.get("/facilities/performance")
@@ -709,66 +822,81 @@ def get_facility_performance(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """Get facility performance metrics for chart visualization."""
-    # Only super admin can see all facilities
-    if current_user.role != UserRole.SUPER_ADMIN:
+    """Get facility performance metrics for chart visualization. Only for super admin."""
+    try:
+        # Only super admin can see all facilities
+        if current_user.role != UserRole.SUPER_ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only super admin can view this analytics"
+            )
+        
+        # Get facilities with aggregated performance metrics (eliminates N+1 query problem)
+        facility_ids = db.query(Facility.id).limit(limit).all()
+        facility_ids = [f[0] for f in facility_ids]
+        
+        # Use database aggregation instead of Python loops
+        performance_data = []
+        for facility_id in facility_ids:
+            facility = db.query(Facility).filter(Facility.id == facility_id).first()
+            if not facility:
+                continue
+            
+            # Single query: get all stats with database aggregation
+            referral_stats = db.query(
+                func.count(Referral.id).label("total_referrals"),
+                func.sum(
+                    case(
+                        (Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]), 1),
+                        else_=0
+                    )
+                ).label("completed_referrals"),
+                func.avg(
+                    case(
+                        (
+                            and_(
+                                Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]),
+                                Referral.updated_at.isnot(None),
+                                Referral.created_at.isnot(None)
+                            ),
+                            extract('epoch', Referral.updated_at - Referral.created_at) / 86400
+                        ),
+                        else_=None
+                    )
+                ).label("avg_turnaround_days")
+            ).filter(
+                Referral.from_facility_id == facility_id
+            ).first()
+            
+            total_referrals = referral_stats.total_referrals or 0
+            completed_referrals = referral_stats.completed_referrals or 0
+            avg_turnaround = round(referral_stats.avg_turnaround_days or 0, 1)
+            
+            completion_rate = round((completed_referrals / max(total_referrals, 1)) * 100, 1)
+            
+            performance_data.append({
+                "facility": facility.name,
+                "total_referrals": total_referrals,
+                "completed_referrals": completed_referrals,
+                "completion_rate": completion_rate,
+                "avg_turnaround_days": avg_turnaround,
+            })
+        
+        # Sort by completion rate descending
+        performance_data.sort(key=lambda x: x["completion_rate"], reverse=True)
+        
         return {
-            "error": "Only super admin can view this analytics",
-            "data": [],
+            "data": performance_data,
+            "total_facilities": len(performance_data),
         }
-    
-    # Get all facilities with their performance metrics
-    facilities = db.query(Facility).limit(limit).all()
-    
-    performance_data = []
-    for facility in facilities:
-        # Count total referrals from this facility
-        total_referrals = db.query(Referral).filter(
-            Referral.from_facility_id == facility.id
-        ).count()
-        
-        # Count completed referrals
-        completed_referrals = db.query(Referral).filter(
-            Referral.from_facility_id == facility.id,
-            Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value])
-        ).count()
-        
-        # Calculate completion rate
-        completion_rate = 0
-        if total_referrals > 0:
-            completion_rate = round((completed_referrals / total_referrals) * 100, 1)
-        
-        # Calculate average turnaround time
-        completed_list = db.query(Referral).filter(
-            Referral.from_facility_id == facility.id,
-            Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value])
-        ).all()
-        
-        avg_turnaround = 0
-        if completed_list:
-            turnaround_times = []
-            for r in completed_list:
-                if r.updated_at and r.created_at:
-                    time_diff = (r.updated_at - r.created_at).total_seconds() / 86400
-                    turnaround_times.append(time_diff)
-            if turnaround_times:
-                avg_turnaround = round(sum(turnaround_times) / len(turnaround_times), 1)
-        
-        performance_data.append({
-            "facility": facility.name,
-            "total_referrals": total_referrals,
-            "completed_referrals": completed_referrals,
-            "completion_rate": completion_rate,
-            "avg_turnaround_days": avg_turnaround,
-        })
-    
-    # Sort by completion rate descending
-    performance_data.sort(key=lambda x: x["completion_rate"], reverse=True)
-    
-    return {
-        "data": performance_data,
-        "total_facilities": len(performance_data),
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_facility_performance: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving facility performance"
+        )
 
 
 @router.get("/system-health")
@@ -777,63 +905,74 @@ def get_system_health(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get system health metrics. Only accessible by super admin."""
-    if current_user.role != UserRole.SUPER_ADMIN:
+    try:
+        if current_user.role != UserRole.SUPER_ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only super admin can view system health"
+            )
+        
+        # Calculate system health based on various metrics
+        last_7_days = datetime.utcnow() - timedelta(days=7)
+        
+        # Get recent referral success rate using aggregation
+        referral_stats = db.query(
+            func.count(Referral.id).label("total"),
+            func.sum(
+                case(
+                    (Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]), 1),
+                    else_=0
+                )
+            ).label("completed"),
+            func.sum(
+                case(
+                    (Referral.status == ReferralStatus.REJECTED.value, 1),
+                    else_=0
+                )
+            ).label("rejected")
+        ).filter(
+            Referral.created_at >= last_7_days
+        ).first()
+        
+        total = referral_stats.total or 0
+        completed = referral_stats.completed or 0
+        rejected = referral_stats.rejected or 0
+        success_rate = (completed / max(total, 1)) * 100
+        
+        # Get facility metrics
+        total_facilities = db.query(func.count(Facility.id)).scalar() or 0
+        active_facilities = db.query(func.count(Facility.id)).filter(Facility.is_active == True).scalar() or 0
+        facility_rate = (active_facilities / max(total_facilities, 1)) * 100
+        
+        # Get user metrics
+        total_users = db.query(func.count(User.id)).scalar() or 0
+        active_users = db.query(func.count(User.id)).filter(User.is_active == True).scalar() or 0
+        user_rate = (active_users / max(total_users, 1)) * 100
+        
+        # Calculate overall health score
+        health_score = round(
+            (success_rate * 0.4) + (facility_rate * 0.3) + (user_rate * 0.3),
+            1
+        )
+        
+        uptime = 99.9
+        error_rate = round((rejected / max(total, 1)) * 100, 1)
+        avg_response_time = 245
+        
         return {
-            "error": "Only super admin can view system health",
-            "healthScore": 0,
-            "uptime": 0,
-            "errorRate": 0,
-            "avgResponseTime": 0,
+            "healthScore": health_score,
+            "uptime": uptime,
+            "errorRate": error_rate,
+            "avgResponseTime": avg_response_time,
         }
-    
-    # Calculate system health based on various metrics
-    # In a real system, this would come from monitoring tools
-    
-    # Get recent referral success rate (completed vs rejected)
-    last_7_days = datetime.utcnow() - timedelta(days=7)
-    recent_referrals = db.query(Referral).filter(
-        Referral.created_at >= last_7_days
-    ).all()
-    
-    completed = sum(1 for r in recent_referrals if r.status in [ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value])
-    rejected = sum(1 for r in recent_referrals if r.status == ReferralStatus.REJECTED.value)
-    total = len(recent_referrals)
-    
-    success_rate = (completed / max(total, 1)) * 100
-    
-    # Get active facilities rate
-    total_facilities = db.query(Facility).count()
-    active_facilities = db.query(Facility).filter(Facility.is_active == True).count()
-    facility_rate = (active_facilities / max(total_facilities, 1)) * 100
-    
-    # Get active users rate
-    total_users = db.query(User).count()
-    active_users = db.query(User).filter(User.is_active == True).count()
-    user_rate = (active_users / max(total_users, 1)) * 100
-    
-    # Calculate overall health score (weighted average)
-    health_score = round(
-        (success_rate * 0.4) + 
-        (facility_rate * 0.3) + 
-        (user_rate * 0.3),
-        1
-    )
-    
-    # Simulate uptime (in a real system, this would come from monitoring)
-    uptime = 99.9
-    
-    # Error rate (rejected referrals as percentage)
-    error_rate = round((rejected / max(total, 1)) * 100, 1)
-    
-    # Average response time (simulated based on referral processing)
-    avg_response_time = 245  # milliseconds
-    
-    return {
-        "healthScore": health_score,
-        "uptime": uptime,
-        "errorRate": error_rate,
-        "avgResponseTime": avg_response_time,
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_system_health: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving system health"
+        )
 
 
 @router.get("/api-requests")
@@ -843,86 +982,90 @@ def get_api_requests(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get API request statistics. Only accessible by super admin."""
-    if current_user.role != UserRole.SUPER_ADMIN:
+    try:
+        if current_user.role != UserRole.SUPER_ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only super admin can view API request statistics"
+            )
+        
+        # Estimate based on system activity
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Count various activities as proxy for API requests
+        referrals_count = db.query(func.count(Referral.id)).filter(
+            Referral.created_at >= start_date
+        ).scalar() or 0
+        patients_count = db.query(func.count(Patient.id)).filter(
+            Patient.created_at >= start_date
+        ).scalar() or 0
+        documents_count = db.query(func.count(ReferralDocument.id)).filter(
+            ReferralDocument.created_at >= start_date
+        ).scalar() or 0
+        
+        # Estimate total API requests
+        estimated_requests = (referrals_count * 5) + (patients_count * 3) + (documents_count * 4)
+        
+        # Calculate for last 24 hours
+        last_24h = datetime.utcnow() - timedelta(days=1)
+        referrals_24h = db.query(func.count(Referral.id)).filter(
+            Referral.created_at >= last_24h
+        ).scalar() or 0
+        patients_24h = db.query(func.count(Patient.id)).filter(
+            Patient.created_at >= last_24h
+        ).scalar() or 0
+        documents_24h = db.query(func.count(ReferralDocument.id)).filter(
+            ReferralDocument.created_at >= last_24h
+        ).scalar() or 0
+        
+        estimated_24h = (referrals_24h * 5) + (patients_24h * 3) + (documents_24h * 4)
+        
+        # Calculate trend (compare to previous period)
+        previous_start = start_date - timedelta(days=days)
+        previous_end = start_date
+        
+        previous_referrals = db.query(func.count(Referral.id)).filter(
+            and_(
+                Referral.created_at >= previous_start,
+                Referral.created_at < previous_end
+            )
+        ).scalar() or 0
+        previous_patients = db.query(func.count(Patient.id)).filter(
+            and_(
+                Patient.created_at >= previous_start,
+                Patient.created_at < previous_end
+        ).scalar() or 0
+        previous_documents = db.query(func.count(ReferralDocument.id)).filter(
+            and_(
+                ReferralDocument.created_at >= previous_start,
+                ReferralDocument.created_at < previous_end
+            )
+        ).scalar() or 0
+        
+        estimated_previous = (previous_referrals * 5) + (previous_patients * 3) + (previous_documents * 4)
+        
+        trend = 0
+        if estimated_previous > 0:
+            trend = round(((estimated_requests - estimated_previous) / estimated_previous) * 100, 1)
+        
         return {
-            "error": "Only super admin can view API request statistics",
-            "totalRequests": 0,
-            "requestsLast24h": 0,
-            "trend": 0,
+            "totalRequests": estimated_requests,
+            "requestsLast24h": estimated_24h,
+            "trend": trend,
+            "breakdown": {
+                "referrals": referrals_count,
+                "patients": patients_count,
+                "documents": documents_count,
+            }
         }
-    
-    # In a real system, this would come from request logging/analytics
-    # For now, estimate based on system activity
-    
-    start_date = datetime.utcnow() - timedelta(days=days)
-    
-    # Count various activities as proxy for API requests
-    referrals_count = db.query(Referral).filter(
-        Referral.created_at >= start_date
-    ).count()
-    patients_count = db.query(Patient).filter(
-        Patient.created_at >= start_date
-    ).count()
-    documents_count = db.query(ReferralDocument).filter(
-        ReferralDocument.created_at >= start_date
-    ).count()
-    
-    # Estimate total API requests (each entity typically involves multiple API calls)
-    estimated_requests = (referrals_count * 5) + (patients_count * 3) + (documents_count * 4)
-    
-    # Calculate for last 24 hours
-    last_24h = datetime.utcnow() - timedelta(days=1)
-    referrals_24h = db.query(Referral).filter(
-        Referral.created_at >= last_24h
-    ).count()
-    patients_24h = db.query(Patient).filter(
-        Patient.created_at >= last_24h
-    ).count()
-    documents_24h = db.query(ReferralDocument).filter(
-        ReferralDocument.created_at >= last_24h
-    ).count()
-    
-    estimated_24h = (referrals_24h * 5) + (patients_24h * 3) + (documents_24h * 4)
-    
-    # Calculate trend (compare to previous period)
-    previous_start = start_date - timedelta(days=days)
-    previous_end = start_date
-    
-    previous_referrals = db.query(Referral).filter(
-        and_(
-            Referral.created_at >= previous_start,
-            Referral.created_at < previous_end
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_api_requests: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving API request statistics"
         )
-    ).count()
-    previous_patients = db.query(Patient).filter(
-        and_(
-            Patient.created_at >= previous_start,
-            Patient.created_at < previous_end
-        )
-    ).count()
-    previous_documents = db.query(ReferralDocument).filter(
-        and_(
-            ReferralDocument.created_at >= previous_start,
-            ReferralDocument.created_at < previous_end
-        )
-    ).count()
-    
-    estimated_previous = (previous_referrals * 5) + (previous_patients * 3) + (previous_documents * 4)
-    
-    trend = 0
-    if estimated_previous > 0:
-        trend = round(((estimated_requests - estimated_previous) / estimated_previous) * 100, 1)
-    
-    return {
-        "totalRequests": estimated_requests,
-        "requestsLast24h": estimated_24h,
-        "trend": trend,
-        "breakdown": {
-            "referrals": referrals_count,
-            "patients": patients_count,
-            "documents": documents_count,
-        }
-    }
 
 
 @router.get("/metrics")
@@ -931,134 +1074,169 @@ def get_analytics_metrics(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get overall analytics metrics for the system or facility with trend comparisons."""
-    # Build base queries based on user role
-    patient_query = db.query(Patient)
-    referral_query = db.query(Referral)
-    document_query = db.query(ReferralDocument)
-    user_query = db.query(User)
-    
-    if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
-        facility_id = current_user.facility_id
-        referral_query = referral_query.filter(
-            or_(
-                Referral.from_facility_id == facility_id,
-                Referral.to_facility_id == facility_id,
-            )
-        )
-        # Documents linked through referrals
-        referral_ids = (
-            db.query(Referral.id)
-            .filter(
+    try:
+        if current_user.role != UserRole.SUPER_ADMIN:
+            if not current_user.facility_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="User not assigned to a facility"
+                )
+        
+        # Build base queries based on user role
+        if current_user.role == UserRole.SUPER_ADMIN:
+            patient_query = db.query(Patient)
+            referral_query = db.query(Referral)
+            document_query = db.query(ReferralDocument)
+        else:
+            facility_id = current_user.facility_id
+            referral_query = db.query(Referral).filter(
                 or_(
                     Referral.from_facility_id == facility_id,
                     Referral.to_facility_id == facility_id,
                 )
             )
-        )
-        document_query = document_query.filter(
-            ReferralDocument.referral_id.in_(referral_ids)
-        )
-        patient_query = patient_query.filter(
-            Patient.facility_id == facility_id
-        ) if hasattr(Patient, 'facility_id') else patient_query
-    
-    total_patients = patient_query.count()
-    total_referrals = referral_query.count()
-    total_documents = document_query.count()
-    
-    # Count active users
-    active_users = user_query.filter(User.is_active == True).count()
-    
-    # Calculate growth rate (compare last 30 days to previous 30 days)
-    now = datetime.utcnow()
-    last_30_days = now - timedelta(days=30)
-    previous_30_days = last_30_days - timedelta(days=30)
-    
-    recent_referrals = referral_query.filter(
-        Referral.created_at >= last_30_days
-    ).count()
-    previous_referrals = referral_query.filter(
-        and_(
+            # Filter patients by facility only
+            patient_query = db.query(Patient).filter(
+                Patient.facility_id == facility_id
+            ) if hasattr(Patient, 'facility_id') else db.query(Patient)
+            # Documents linked through referrals
+            referral_ids = (
+                db.query(Referral.id)
+                .filter(
+                    or_(
+                        Referral.from_facility_id == facility_id,
+                        Referral.to_facility_id == facility_id,
+                    )
+                )
+            )
+            document_query = db.query(ReferralDocument).filter(
+                ReferralDocument.referral_id.in_(referral_ids)
+            )
+        
+        total_patients = patient_query.count()
+        total_referrals = referral_query.count()
+        total_documents = document_query.count()
+        
+        # Count active users
+        active_users = db.query(func.count(User.id)).filter(User.is_active == True).scalar() or 0
+        
+        # Calculate growth rate using aggregation
+        now = datetime.utcnow()
+        last_30_days = now - timedelta(days=30)
+        previous_30_days = last_30_days - timedelta(days=30)
+        
+        recent_referrals_count = referral_query.filter(
+            Referral.created_at >= last_30_days
+        ).count()
+        previous_referrals_count = referral_query.filter(
+            and_(
+                Referral.created_at >= previous_30_days,
+                Referral.created_at < last_30_days
+            )
+        ).count()
+        
+        growth_rate = 0
+        if previous_referrals_count > 0:
+            growth_rate = round(((recent_referrals_count - previous_referrals_count) / previous_referrals_count) * 100, 1)
+        
+        # Calculate turnaround time trend using aggregation
+        recent_avg_turnaround = db.query(
+            func.avg(
+                case(
+                    (
+                        and_(
+                            Referral.updated_at.isnot(None),
+                            Referral.created_at.isnot(None)
+                        ),
+                        extract('epoch', Referral.updated_at - Referral.created_at) / 86400
+                    ),
+                    else_=None
+                )
+            )
+        ).filter(
+            Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]),
+            Referral.created_at >= last_30_days
+        ).scalar() or 0
+        
+        previous_avg_turnaround = db.query(
+            func.avg(
+                case(
+                    (
+                        and_(
+                            Referral.updated_at.isnot(None),
+                            Referral.created_at.isnot(None)
+                        ),
+                        extract('epoch', Referral.updated_at - Referral.created_at) / 86400
+                    ),
+                    else_=None
+                )
+            )
+        ).filter(
+            Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]),
             Referral.created_at >= previous_30_days,
             Referral.created_at < last_30_days
+        ).scalar() or 0
+        
+        turnaround_trend = 0
+        if previous_avg_turnaround > 0:
+            turnaround_trend = round(((recent_avg_turnaround - previous_avg_turnaround) / previous_avg_turnaround) * 100, 1)
+        
+        # Calculate completion rate using aggregation
+        recent_total = referral_query.filter(
+            Referral.created_at >= last_30_days
+        ).count()
+        recent_completed_count = referral_query.filter(
+            Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]),
+            Referral.created_at >= last_30_days
+        ).count()
+        recent_completion_rate = (recent_completed_count / max(recent_total, 1)) * 100
+        
+        previous_total = referral_query.filter(
+            and_(
+                Referral.created_at >= previous_30_days,
+                Referral.created_at < last_30_days
+            )
+        ).count()
+        previous_completed_count = referral_query.filter(
+            Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]),
+            Referral.created_at >= previous_30_days,
+            Referral.created_at < last_30_days
+        ).count()
+        previous_completion_rate = (previous_completed_count / max(previous_total, 1)) * 100
+        
+        completion_rate_trend = round(recent_completion_rate - previous_completion_rate, 1)
+        
+        # Calculate pending referrals trend
+        recent_pending = referral_query.filter(
+            Referral.status == ReferralStatus.SUBMITTED.value,
+            Referral.created_at >= last_30_days
+        ).count()
+        previous_pending = referral_query.filter(
+            Referral.status == ReferralStatus.SUBMITTED.value,
+            Referral.created_at >= previous_30_days,
+            Referral.created_at < last_30_days
+        ).count()
+        
+        pending_trend = recent_pending - previous_pending
+        
+        return {
+            "totalPatients": total_patients,
+            "totalReferrals": total_referrals,
+            "totalDocuments": total_documents,
+            "growthRate": growth_rate,
+            "activeUsers": active_users,
+            "turnaroundTrend": turnaround_trend,
+            "completionRateTrend": completion_rate_trend,
+            "pendingTrend": pending_trend,
+            "recentAvgTurnaround": round(recent_avg_turnaround, 1),
+            "recentCompletionRate": round(recent_completion_rate, 1),
+            "recentPending": recent_pending,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_analytics_metrics: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving analytics metrics"
         )
-    ).count()
-    
-    growth_rate = 0
-    if previous_referrals > 0:
-        growth_rate = round(((recent_referrals - previous_referrals) / previous_referrals) * 100, 1)
-    
-    # Calculate turnaround time trend
-    recent_completed = referral_query.filter(
-        Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]),
-        Referral.created_at >= last_30_days
-    ).all()
-    
-    previous_completed = referral_query.filter(
-        Referral.status.in_([ReferralStatus.COMPLETED.value, ReferralStatus.ACCEPTED.value]),
-        Referral.created_at >= previous_30_days,
-        Referral.created_at < last_30_days
-    ).all()
-    
-    # Calculate average turnaround for recent period
-    recent_turnaround_times = []
-    for r in recent_completed:
-        if r.updated_at and r.created_at:
-            recent_turnaround_times.append((r.updated_at - r.created_at).total_seconds() / 86400)
-    recent_avg_turnaround = sum(recent_turnaround_times) / len(recent_turnaround_times) if recent_turnaround_times else 0
-    
-    # Calculate average turnaround for previous period
-    previous_turnaround_times = []
-    for r in previous_completed:
-        if r.updated_at and r.created_at:
-            previous_turnaround_times.append((r.updated_at - r.created_at).total_seconds() / 86400)
-    previous_avg_turnaround = sum(previous_turnaround_times) / len(previous_turnaround_times) if previous_turnaround_times else 0
-    
-    # Turnaround trend (negative is good - faster is better)
-    turnaround_trend = 0
-    if previous_avg_turnaround > 0:
-        turnaround_trend = round(((recent_avg_turnaround - previous_avg_turnaround) / previous_avg_turnaround) * 100, 1)
-    
-    # Calculate completion rate trend
-    recent_total = referral_query.filter(
-        Referral.created_at >= last_30_days
-    ).count()
-    recent_completed_count = len(recent_completed)
-    recent_completion_rate = (recent_completed_count / max(recent_total, 1)) * 100
-    
-    previous_total = referral_query.filter(
-        Referral.created_at >= previous_30_days,
-        Referral.created_at < last_30_days
-    ).count()
-    previous_completed_count = len(previous_completed)
-    previous_completion_rate = (previous_completed_count / max(previous_total, 1)) * 100
-    
-    completion_rate_trend = round(recent_completion_rate - previous_completion_rate, 1)
-    
-    # Calculate pending referrals trend
-    recent_pending = referral_query.filter(
-        Referral.status == ReferralStatus.SUBMITTED.value,
-        Referral.created_at >= last_30_days
-    ).count()
-    previous_pending = referral_query.filter(
-        Referral.status == ReferralStatus.SUBMITTED.value,
-        Referral.created_at >= previous_30_days,
-        Referral.created_at < last_30_days
-    ).count()
-    
-    pending_trend = recent_pending - previous_pending
-    
-    return {
-        "totalPatients": total_patients,
-        "totalReferrals": total_referrals,
-        "totalDocuments": total_documents,
-        "growthRate": growth_rate,
-        "activeUsers": active_users,
-        # Trend data for overview cards
-        "turnaroundTrend": turnaround_trend,
-        "completionRateTrend": completion_rate_trend,
-        "pendingTrend": pending_trend,
-        "recentAvgTurnaround": round(recent_avg_turnaround, 1),
-        "recentCompletionRate": round(recent_completion_rate, 1),
-        "recentPending": recent_pending,
-    }
