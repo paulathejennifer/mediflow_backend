@@ -197,77 +197,77 @@ def get_dashboard_kpis(
             }
         
         elif current_user.facility_id:
-        # Facility-based user (Facility Admin or Clinician)
-        facility_id = current_user.facility_id
-        
-        # Patients from this facility ONLY
-        total_patients = db.query(Patient).filter(
-            Patient.facility_id == facility_id
-        ).count() if hasattr(Patient, 'facility_id') else 0
-        
-        # Referrals for this facility
-        facility_referrals = db.query(Referral).filter(
-            and_(
-                or_(
-                    Referral.from_facility_id == facility_id,
-                    Referral.to_facility_id == facility_id,
-                ),
-                Referral.created_at >= start_date,
+            # Facility-based user (Facility Admin or Clinician)
+            facility_id = current_user.facility_id
+            
+            # Patients from this facility ONLY
+            total_patients = db.query(Patient).filter(
+                Patient.facility_id == facility_id
+            ).count() if hasattr(Patient, 'facility_id') else 0
+            
+            # Referrals for this facility
+            facility_referrals = db.query(Referral).filter(
+                and_(
+                    or_(
+                        Referral.from_facility_id == facility_id,
+                        Referral.to_facility_id == facility_id,
+                    ),
+                    Referral.created_at >= start_date,
+                )
             )
-        )
-        
-        total_referrals = facility_referrals.count()
-        
-        # Sent from this facility
-        sent_referrals = facility_referrals.filter(
-            Referral.from_facility_id == facility_id
-        ).count()
-        
-        # Received by this facility
-        received_referrals = facility_referrals.filter(
-            Referral.to_facility_id == facility_id
-        ).count()
-        
-        # Active referrals
-        active_statuses = [
-            ReferralStatus.DRAFT.value,
-            ReferralStatus.SUBMITTED.value,
-            ReferralStatus.ACCEPTED.value,
-            ReferralStatus.IN_TRANSIT.value,
-            ReferralStatus.RECEIVED.value,
-        ]
-        active_referrals = facility_referrals.filter(
-            Referral.status.in_(active_statuses)
-        ).count()
-        
-        # Pending (submitted, awaiting response)
-        pending_referrals = facility_referrals.filter(
-            Referral.status == ReferralStatus.SUBMITTED.value
-        ).count()
-        
-        # This facility's info
-        facility = db.query(Facility).filter(
-            Facility.id == facility_id
-        ).first()
-        
-        return {
-            "facility_name": facility.name if facility else "Unknown",
-            "total_patients": total_patients,
-            "total_referrals_30d": total_referrals,
-            "sent_referrals_30d": sent_referrals,
-            "received_referrals_30d": received_referrals,
-            "active_referrals": active_referrals,
-            "pending_referrals": pending_referrals,
-            "facility_utilization_percent": min(
-                round((total_referrals / 100) * 100, 1),
-                100
-            ),
-        }
-    else:
-        # User without facility
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User not assigned to a facility"
+            
+            total_referrals = facility_referrals.count()
+            
+            # Sent from this facility
+            sent_referrals = facility_referrals.filter(
+                Referral.from_facility_id == facility_id
+            ).count()
+            
+            # Received by this facility
+            received_referrals = facility_referrals.filter(
+                Referral.to_facility_id == facility_id
+            ).count()
+            
+            # Active referrals
+            active_statuses = [
+                ReferralStatus.DRAFT.value,
+                ReferralStatus.SUBMITTED.value,
+                ReferralStatus.ACCEPTED.value,
+                ReferralStatus.IN_TRANSIT.value,
+                ReferralStatus.RECEIVED.value,
+            ]
+            active_referrals = facility_referrals.filter(
+                Referral.status.in_(active_statuses)
+            ).count()
+            
+            # Pending (submitted, awaiting response)
+            pending_referrals = facility_referrals.filter(
+                Referral.status == ReferralStatus.SUBMITTED.value
+            ).count()
+            
+            # This facility's info
+            facility = db.query(Facility).filter(
+                Facility.id == facility_id
+            ).first()
+            
+            return {
+                "facility_name": facility.name if facility else "Unknown",
+                "total_patients": total_patients,
+                "total_referrals_30d": total_referrals,
+                "sent_referrals_30d": sent_referrals,
+                "received_referrals_30d": received_referrals,
+                "active_referrals": active_referrals,
+                "pending_referrals": pending_referrals,
+                "facility_utilization_percent": min(
+                    round((total_referrals / 100) * 100, 1),
+                    100
+                ),
+            }
+        else:
+            # User without facility
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User not assigned to a facility"
         )
     
     except Exception as e:
