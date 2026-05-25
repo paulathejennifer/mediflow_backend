@@ -1,7 +1,7 @@
 """add notification tables
 
 Revision ID: 011_add_notification_tables
-Revises: 009_add_patient_facility_id
+Revises: 010_change_users_is_active_to_boolean
 Create Date: 2026-05-25 14:00:00.000000
 """
 from alembic import op
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '011_add_notification_tables'
-down_revision = '009_add_patient_facility_id'
+down_revision = '010_change_users_is_active_to_boolean'
 branch_labels = None
 depends_on = None
 
