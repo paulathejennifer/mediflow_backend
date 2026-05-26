@@ -9,7 +9,6 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func, Any, JSON
 from sqlalchemy import and_, or_, func, JSON
 
 from app.models.notifications import (
@@ -29,7 +28,6 @@ from app.websocket.manager import notification_broadcaster
 from app.core.security import get_password_hash
 from app.enums import ReferralStatus, UserRole, AuditAction, Priority
 from app.services.notification_events import NotificationEventCreators
-from app.core.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -78,13 +76,10 @@ class NotificationService(NotificationEventCreators):
 
         logger.info(f"Created notification {notification.id}: {title}")
 
-        # Broadcast notification immediately
         # Broadcast notification immediately using a background task.
         # We pass the ID to avoid session-closed errors in async tasks.
         import asyncio
-
         asyncio.create_task(
-            self.broadcaster.broadcast_notification(notification, self.db)
             self.broadcaster.broadcast_notification(notification.id)
         )
 
@@ -112,8 +107,6 @@ class NotificationService(NotificationEventCreators):
                 Notification.user_id == user_id,
                 and_(
                     Notification.user_id.is_(None),
-                    # PostgreSQL specific JSON containment check
-                    Notification.roles.cast(Any).contains(user_role),
                     # Standard JSON containment check for roles list
                     Notification.roles.contains([user_role]),
                 ),
