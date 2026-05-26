@@ -16,12 +16,13 @@ from app.models.patient_identifier import PatientIdentifier
 from app.models.facility import Facility
 from app.models.user import User
 from app.services.mrn_service import MRNService
-from app.enums import UserRole, AuditAction
+from app.enums import UserRole, AuditAction, AuditAction
 
 router = APIRouter()
 
 
 @router.post("", response_model=PatientWithIdentifiers)
+@router.post("/", response_model=PatientWithIdentifiers)
 def create_patient(
     patient_data: PatientCreate,
     db: Session = Depends(get_db),
@@ -99,6 +100,7 @@ def create_patient(
 
 
 @router.get("", response_model=List[PatientWithIdentifiers])
+@router.get("/", response_model=List[PatientWithIdentifiers])
 def list_patients(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
