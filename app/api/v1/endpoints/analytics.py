@@ -970,12 +970,12 @@ def get_system_health(
         
         # Get facility metrics
         total_facilities = db.query(func.count(Facility.id)).scalar() or 0
-        active_facilities = db.query(func.count(Facility.id)).filter(Facility.is_active == True).scalar() or 0
+        active_facilities = db.query(func.count(Facility.id)).filter(Facility.is_active == "true").scalar() or 0
         facility_rate = (active_facilities / max(total_facilities, 1)) * 100
         
         # Get user metrics
         total_users = db.query(func.count(User.id)).scalar() or 0
-        active_users = db.query(func.count(User.id)).filter(User.is_active == True).scalar() or 0
+        active_users = db.query(func.count(User.id)).filter(User.is_active == "true").scalar() or 0
         user_rate = (active_users / max(total_users, 1)) * 100
         
         # Calculate overall health score
@@ -1148,7 +1148,7 @@ def get_analytics_metrics(
         total_documents = document_query.count()
         
         # Count active users
-        active_users = db.query(func.count(User.id)).filter(User.is_active == True).scalar() or 0
+        active_users = db.query(func.count(User.id)).filter(User.is_active == "true").scalar() or 0
         
         # Calculate growth rate using aggregation
         now = datetime.utcnow()

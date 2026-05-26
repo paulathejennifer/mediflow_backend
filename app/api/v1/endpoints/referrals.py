@@ -111,7 +111,7 @@ def create_referral(
         # SA001: Trigger notification for urgent/emergency drafts
         # While clinicians usually check the dashboard, emergency drafts
         # require immediate visibility.
-        if referral.priority == Priority.EMERGENCY.value:
+        if referral.priority == Priority.EMERGENCY.value or referral.priority == "emergency":
             get_notification_service(db).create_incoming_referral_notification(referral)
 
         return referral

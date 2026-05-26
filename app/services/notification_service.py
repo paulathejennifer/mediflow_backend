@@ -9,7 +9,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func, JSON
+from sqlalchemy import and_, or_, func, JSON, cast
 
 from app.models.notifications import (
     Notification,
@@ -107,8 +107,8 @@ class NotificationService(NotificationEventCreators):
                 Notification.user_id == user_id,
                 and_(
                     Notification.user_id.is_(None),
-                    # Standard SQLAlchemy JSON containment check
-                    Notification.roles.contains([user_role]),
+                    # Force PostgreSQL JSONB containment operator (@>)
+                    Notification.roles.contains(cast([user_role], JSON)),
                 ),
             )
         )
