@@ -156,6 +156,22 @@ def get_dashboard_kpis(
             ).count()
             patient_trend = calculate_trend(new_patients_current, new_patients_prev)
 
+            # Calculate User Trend
+            total_users = db.query(User).count()
+            new_users_current = db.query(User).filter(User.created_at >= start_date).count()
+            new_users_prev = db.query(User).filter(
+                and_(User.created_at >= prev_start_date, User.created_at < start_date)
+            ).count()
+            user_trend = calculate_trend(new_users_current, new_users_prev)
+
+            # Calculate Document Trend
+            total_documents = db.query(ReferralDocument).count()
+            new_docs_current = db.query(ReferralDocument).filter(ReferralDocument.created_at >= start_date).count()
+            new_docs_prev = db.query(ReferralDocument).filter(
+                and_(ReferralDocument.created_at >= prev_start_date, ReferralDocument.created_at < start_date)
+            ).count()
+            doc_trend = calculate_trend(new_docs_current, new_docs_prev)
+
             total_facilities = db.query(Facility).count()
             total_referrals = db.query(Referral).filter(
                 Referral.created_at >= start_date
@@ -206,9 +222,13 @@ def get_dashboard_kpis(
             return {
                 "total_patients": total_patients,
                 "total_patients_trend": patient_trend,
+                "total_users": total_users,
+                "total_users_trend": user_trend,
                 "total_facilities": total_facilities,
                 "total_referrals_30d": total_referrals,
                 "total_referrals_trend": referral_trend,
+                "total_documents": total_documents,
+                "total_documents_trend": doc_trend,
                 "active_referrals": active_referrals,
                 "pending_referrals": pending_referrals,
                 "rejection_rate": round(rejection_rate, 2),
@@ -241,6 +261,20 @@ def get_dashboard_kpis(
             ).count()
             patient_trend = calculate_trend(new_patients_current, new_patients_prev)
 
+            # Facility User Trend
+            total_users = db.query(User).filter(User.facility_id == facility_id).count()
+            new_users_current = db.query(User).filter(
+                and_(User.facility_id == facility_id, User.created_at >= start_date)
+            ).count()
+            new_users_prev = db.query(User).filter(
+                and_(
+                    User.facility_id == facility_id,
+                    User.created_at >= prev_start_date,
+                    User.created_at < start_date
+                )
+            ).count()
+            user_trend = calculate_trend(new_users_current, new_users_prev)
+
             # Referrals for this facility
             facility_referrals = db.query(Referral).filter(
                 and_(
@@ -263,6 +297,26 @@ def get_dashboard_kpis(
                 )
             ).count()
             referral_trend = calculate_trend(total_referrals, total_referrals_prev)
+            
+            # Document stats for facility
+            referral_ids = db.query(Referral.id).filter(
+                or_(Referral.from_facility_id == facility_id, Referral.to_facility_id == facility_id)
+            ).subquery()
+            
+            total_documents = db.query(ReferralDocument).filter(
+                ReferralDocument.referral_id.in_(referral_ids)
+            ).count()
+            new_docs_current = db.query(ReferralDocument).filter(
+                and_(ReferralDocument.referral_id.in_(referral_ids), ReferralDocument.created_at >= start_date)
+            ).count()
+            new_docs_prev = db.query(ReferralDocument).filter(
+                and_(
+                    ReferralDocument.referral_id.in_(referral_ids),
+                    ReferralDocument.created_at >= prev_start_date,
+                    ReferralDocument.created_at < start_date
+                )
+            ).count()
+            doc_trend = calculate_trend(new_docs_current, new_docs_prev)
 
             # Sent from this facility
             sent_referrals = facility_referrals.filter(
@@ -300,10 +354,14 @@ def get_dashboard_kpis(
                 "facility_name": facility.name if facility else "Unknown",
                 "total_patients": total_patients,
                 "total_patients_trend": patient_trend,
+                "total_users": total_users,
+                "total_users_trend": user_trend,
                 "total_referrals_30d": total_referrals,
                 "total_referrals_trend": referral_trend,
                 "sent_referrals_30d": sent_referrals,
                 "received_referrals_30d": received_referrals,
+                "total_documents": total_documents,
+                "total_documents_trend": doc_trend,
                 "active_referrals": active_referrals,
                 "pending_referrals": pending_referrals,
                 "facility_utilization_percent": min(
