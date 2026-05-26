@@ -164,6 +164,23 @@ def get_dashboard_kpis(
             ).count()
             user_trend = calculate_trend(new_users_current, new_users_prev)
 
+            # Calculate Role-specific Trends (for Staff Page)
+            clinician_count = db.query(User).filter(User.role == UserRole.CLINICIAN.value).count()
+            new_clinicians_current = db.query(User).filter(and_(User.role == UserRole.CLINICIAN.value, User.created_at >= start_date)).count()
+            new_clinicians_prev = db.query(User).filter(and_(User.role == UserRole.CLINICIAN.value, User.created_at >= prev_start_date, User.created_at < start_date)).count()
+            clinician_trend = calculate_trend(new_clinicians_current, new_clinicians_prev)
+
+            admin_count = db.query(User).filter(User.role == UserRole.FACILITY_ADMIN.value).count()
+            new_admins_current = db.query(User).filter(and_(User.role == UserRole.FACILITY_ADMIN.value, User.created_at >= start_date)).count()
+            new_admins_prev = db.query(User).filter(and_(User.role == UserRole.FACILITY_ADMIN.value, User.created_at >= prev_start_date, User.created_at < start_date)).count()
+            admin_trend = calculate_trend(new_admins_current, new_admins_prev)
+
+            # Active Users Trend
+            active_users_count = db.query(User).filter(User.is_active == "true").count()
+            new_active_current = db.query(User).filter(and_(User.is_active == "true", User.created_at >= start_date)).count()
+            new_active_prev = db.query(User).filter(and_(User.is_active == "true", User.created_at >= prev_start_date, User.created_at < start_date)).count()
+            active_trend = calculate_trend(new_active_current, new_active_prev)
+
             # Calculate Document Trend
             total_documents = db.query(ReferralDocument).count()
             new_docs_current = db.query(ReferralDocument).filter(ReferralDocument.created_at >= start_date).count()
@@ -224,6 +241,12 @@ def get_dashboard_kpis(
                 "total_patients_trend": patient_trend,
                 "total_users": total_users,
                 "total_users_trend": user_trend,
+                "active_users": active_users_count,
+                "active_users_trend": active_trend,
+                "clinicians_count": clinician_count,
+                "clinicians_trend": clinician_trend,
+                "facility_admins_count": admin_count,
+                "facility_admins_trend": admin_trend,
                 "total_facilities": total_facilities,
                 "total_referrals_30d": total_referrals,
                 "total_referrals_trend": referral_trend,
@@ -274,6 +297,23 @@ def get_dashboard_kpis(
                 )
             ).count()
             user_trend = calculate_trend(new_users_current, new_users_prev)
+
+            # Facility Role-specific Trends
+            clinician_count = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.CLINICIAN.value)).count()
+            new_clinicians_current = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.CLINICIAN.value, User.created_at >= start_date)).count()
+            new_clinicians_prev = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.CLINICIAN.value, User.created_at >= prev_start_date, User.created_at < start_date)).count()
+            clinician_trend = calculate_trend(new_clinicians_current, new_clinicians_prev)
+
+            admin_count = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.FACILITY_ADMIN.value)).count()
+            new_admins_current = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.FACILITY_ADMIN.value, User.created_at >= start_date)).count()
+            new_admins_prev = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.FACILITY_ADMIN.value, User.created_at >= prev_start_date, User.created_at < start_date)).count()
+            admin_trend = calculate_trend(new_admins_current, new_admins_prev)
+
+            # Active Users Trend for Facility
+            active_users_count = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == "true")).count()
+            new_active_current = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == "true", User.created_at >= start_date)).count()
+            new_active_prev = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == "true", User.created_at >= prev_start_date, User.created_at < start_date)).count()
+            active_trend = calculate_trend(new_active_current, new_active_prev)
 
             # Referrals for this facility
             facility_referrals = db.query(Referral).filter(
@@ -356,6 +396,12 @@ def get_dashboard_kpis(
                 "total_patients_trend": patient_trend,
                 "total_users": total_users,
                 "total_users_trend": user_trend,
+                "active_users": active_users_count,
+                "active_users_trend": active_trend,
+                "clinicians_count": clinician_count,
+                "clinicians_trend": clinician_trend,
+                "facility_admins_count": admin_count,
+                "facility_admins_trend": admin_trend,
                 "total_referrals_30d": total_referrals,
                 "total_referrals_trend": referral_trend,
                 "sent_referrals_30d": sent_referrals,
