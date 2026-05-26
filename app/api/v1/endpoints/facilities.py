@@ -104,6 +104,8 @@ def list_facilities(
             type=f.type,
             level=f.level,
             county=f.county,
+            created_at=f.created_at,
+            updated_at=f.updated_at,
         )
         for f in facilities
     ]
