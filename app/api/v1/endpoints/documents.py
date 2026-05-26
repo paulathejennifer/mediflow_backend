@@ -132,33 +132,41 @@ def list_facility_documents(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """List all documents for the user's facility."""
-    if not current_user.facility_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is not associated with a facility",
+    # Super Admin can see all documents, others see facility-specific
+    if current_user.role == UserRole.SUPER_ADMIN:
+        documents = (
+            db.query(ReferralDocument)
+            .order_by(ReferralDocument.created_at.desc())
+            .all()
+        )
+    else:
+        if not current_user.facility_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User is not associated with a facility",
+            )
+
+        # Get all referrals for this facility (both from and to)
+        from app.models.referral import Referral
+
+        referrals = (
+            db.query(Referral)
+            .filter(
+                (Referral.from_facility_id == current_user.facility_id)
+                | (Referral.to_facility_id == current_user.facility_id)
+            )
+            .all()
         )
 
-    # Get all referrals for this facility (both from and to)
-    from app.models.referral import Referral
+        referral_ids = [r.id for r in referrals]
 
-    referrals = (
-        db.query(Referral)
-        .filter(
-            (Referral.from_facility_id == current_user.facility_id)
-            | (Referral.to_facility_id == current_user.facility_id)
+        # Get all documents for these referrals
+        documents = (
+            db.query(ReferralDocument)
+            .filter(ReferralDocument.referral_id.in_(referral_ids))
+            .order_by(ReferralDocument.created_at.desc())
+            .all()
         )
-        .all()
-    )
-
-    referral_ids = [r.id for r in referrals]
-
-    # Get all documents for these referrals
-    documents = (
-        db.query(ReferralDocument)
-        .filter(ReferralDocument.referral_id.in_(referral_ids))
-        .order_by(ReferralDocument.created_at.desc())
-        .all()
-    )
 
     # Create summaries with uploader names
     result = []
