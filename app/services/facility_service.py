@@ -342,20 +342,15 @@ class FacilityService:
         )
 
         # User role breakdown
-        role_stats = {}
-        for role in UserRole:
-            role_count = (
-                self.db.query(User)
-                .filter(
-                    and_(
-                        User.facility_id == facility_id,
-                        User.role == role.value,
-                        User.is_active == "true",
-                    )
-                )
-                .count()
-            )
-            role_stats[role.value] = role_count
+        role_counts = (
+            self.db.query(User.role, func.count(User.id))
+            .filter(User.facility_id == facility_id, User.is_active == "true")
+            .group_by(User.role)
+            .all()
+        )
+        role_stats = {role: count for role, count in role_counts}
+        # Ensure all roles are present even if count is 0
+        role_stats = {role.value: role_stats.get(role.value, 0) for role in UserRole}
 
         # Patient statistics
         patient_count = (
