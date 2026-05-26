@@ -51,7 +51,7 @@ async def list_notifications(
             "actions": n.actions,
             "backend_source": n.backend_source,
             "created_at": n.created_at.isoformat(),
-            "is_read": n.is_read,
+            "is_read": getattr(n, 'user_specific_read', n.is_read),
         } for n in notifications
     ]
 

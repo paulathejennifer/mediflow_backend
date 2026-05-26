@@ -9,8 +9,9 @@ from app.api.v1.endpoints import (
     voice_notes,
     ai,
     analytics,
+    notifications,
 )
-from app.api.v1 import websocket, notifications
+from app.api.v1 import websocket
 
 api_router = APIRouter()
 

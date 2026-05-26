@@ -9,7 +9,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, Any
 
 from app.models.notifications import (
     Notification,
@@ -96,7 +96,7 @@ class NotificationService(NotificationEventCreators):
         """Get notifications for a specific user"""
         
         # Join with delivery to get user-specific read status for broadcast messages
-        query = self.db.query(Notification).outerjoin(
+        query = self.db.query(Notification, NotificationDelivery.delivery_status).outerjoin(
             NotificationDelivery, 
             and_(
                 NotificationDelivery.notification_id == Notification.id,
@@ -136,7 +136,19 @@ class NotificationService(NotificationEventCreators):
             )
         )
 
-        return query.order_by(Notification.created_at.desc()).limit(limit).all()
+        results = query.order_by(Notification.created_at.desc()).limit(limit).all()
+        
+        # Map results to include user-specific read status
+        notifications = []
+        for notif, delivery_status in results:
+            # A notification is "read" for this user if:
+            # 1. It's a direct notification and is_read is True
+            # 2. It's a broadcast and there's a delivery record marked 'read'
+            user_is_read = notif.is_read if notif.user_id == user_id else (delivery_status == "read")
+            notif.user_specific_read = user_is_read
+            notifications.append(notif)
+            
+        return notifications
 
     def mark_notification_read(self, notification_id: int, user_id: int) -> bool:
         """Mark a notification as read"""
