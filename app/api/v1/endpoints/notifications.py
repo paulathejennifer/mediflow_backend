@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+@router.get("")
 @router.get("/", response_model=List[Dict[str, Any]])
 async def list_notifications(
     notification_type: Optional[str] = None,
