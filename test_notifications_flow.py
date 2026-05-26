@@ -1,7 +1,10 @@
 import requests
 import json
+import os
 
-BASE_URL = "http://localhost:8000/api/v1"
+# Read from environment variable or fallback to production Render URL
+BASE_URL = os.getenv("NEXT_PUBLIC_API_URL", "https://mediflow-backend-r2c4.onrender.com/api/v1")
+
 # Replace with your test user credentials
 LOGIN_DATA = {"email": "admin@mediflow.com", "password": "admin123"}
 

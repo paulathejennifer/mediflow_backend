@@ -373,6 +373,23 @@ class NotificationService(NotificationEventCreators):
 
         return notification
 
+    def create_storage_critical_notification(
+        self, used_storage_gb: float, total_storage_gb: float
+    ) -> Notification:
+        """SA006: Create critical storage notification"""
+        return self.create_notification(
+            notification_type="critical",
+            title="🚨 SYSTEM STORAGE CRITICAL",
+            message=f"Server storage is nearly full ({used_storage_gb:.1f}GB / {total_storage_gb:.1f}GB)",
+            details={
+                "used_gb": used_storage_gb,
+                "total_gb": total_storage_gb,
+                "percent_used": (used_storage_gb / total_storage_gb) * 100
+            },
+            roles=["super_admin"],
+            backend_source="system"
+        )
+
     def create_referral_status_notification(self, referral: Referral) -> Notification:
         """Create referral status update notification"""
 

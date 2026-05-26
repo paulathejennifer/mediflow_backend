@@ -7,10 +7,11 @@ MediFlow is an inter-facility patient referral system built with FastAPI, design
 ---
 
 ## Base URL
+The API base URL should be configured via environment variables.
+- **Local Development:** `http://localhost:8000/api/v1`
+- **Production:** `https://mediflow-backend-r2c4.onrender.com/api/v1`
 
-```
-http://localhost:8000/api/v1
-```
+**Variable Name:** `NEXT_PUBLIC_API_URL`
 
 ---
 

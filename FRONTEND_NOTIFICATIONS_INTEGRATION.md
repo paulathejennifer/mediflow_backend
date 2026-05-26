@@ -60,7 +60,10 @@ export const useNotifications = () => {
 
       ws.onmessage = (event) => {
         try {
-          const notification = JSON.parse(event.data);
+          const ssage === 'ping' || message === 'pong') {
+            return; // Ignore WebSocket keep-alive messages
+          }
+          const notification = JSON.parse(message);
           console.log('Notification received:', notification);
           
           setNotifications(prev => {

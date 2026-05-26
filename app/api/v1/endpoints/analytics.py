@@ -8,6 +8,7 @@ from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.referral import Referral
 from app.models.facility import Facility
+from app.models.patient_identifier import PatientIdentifier # Import PatientIdentifier
 from app.models.patient import Patient
 from app.models.referral_document import ReferralDocument
 from app.enums import UserRole, ReferralStatus, Priority
@@ -223,17 +224,21 @@ def get_dashboard_kpis(
             facility_id = current_user.facility_id
             
             # Patients from this facility ONLY
-            total_patients = db.query(Patient).filter(
-                Patient.facility_id == facility_id
-            ).count() if hasattr(Patient, 'facility_id') else 0
+            total_patients = db.query(Patient).join(PatientIdentifier).filter(
+                PatientIdentifier.facility_id == facility_id
+            ).count()
             
             # Facility Patient Trend
-            new_patients_current = db.query(Patient).filter(
-                and_(Patient.facility_id == facility_id, Patient.created_at >= start_date)
-            ).count() if hasattr(Patient, 'facility_id') else 0
-            new_patients_prev = db.query(Patient).filter(
-                and_(Patient.facility_id == facility_id, Patient.created_at >= prev_start_date, Patient.created_at < start_date)
-            ).count() if hasattr(Patient, 'facility_id') else 0
+            new_patients_current = db.query(Patient).join(PatientIdentifier).filter(
+                and_(PatientIdentifier.facility_id == facility_id, Patient.created_at >= start_date)
+            ).count()
+            new_patients_prev = db.query(Patient).join(PatientIdentifier).filter(
+                and_(
+                    PatientIdentifier.facility_id == facility_id, 
+                    Patient.created_at >= prev_start_date, 
+                    Patient.created_at < start_date
+                )
+            ).count()
             patient_trend = calculate_trend(new_patients_current, new_patients_prev)
 
             # Referrals for this facility
@@ -590,7 +595,9 @@ def get_system_activity_trend(
             )
 
             # Filter patients by facility
-            patient_query = patient_query.filter(Patient.facility_id == facility_id)
+            patient_query = patient_query.join(PatientIdentifier).filter(
+                PatientIdentifier.facility_id == facility_id
+            )
 
             # Corrected subquery for referral IDs
             referral_ids = db.query(Referral.id).filter(
@@ -819,32 +826,22 @@ def get_referrals_by_reason(
                 )
             )
         
-        # Get all referrals and group by reason
-        referrals = query.all()
-        reason_counts = {}
-        
-        for referral in referrals:
-            reason = referral.reason_for_referral
-            if not reason or reason.strip() == "":
-                reason = "Not Specified"
-            else:
-                # Normalize the reason (take first line, truncate if too long)
-                reason = reason.split("\n")[0].strip()
-                if len(reason) > 50:
-                    reason = reason[:47] + "..."
-            
-            reason_counts[reason] = reason_counts.get(reason, 0) + 1
-        
-        # Sort by count and take top 10
-        sorted_reasons = sorted(reason_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-        
-        labels = [reason for reason, count in sorted_reasons]
-        data = [count for reason, count in sorted_reasons]
+        # Group by reason using database aggregation to avoid loading all referrals into memory
+        reason_counts = (
+            db.query(
+                Referral.reason_for_referral,
+                func.count(Referral.id).label("count")
+            )
+            .group_by(Referral.reason_for_referral)
+            .order_by(func.count(Referral.id).desc())
+            .limit(10)
+            .all()
+        )
         
         return {
-            "labels": labels,
-            "data": data,
-            "total": sum(data),
+            "labels": [r[0] or "Not Specified" for r in reason_counts],
+            "data": [r[1] for r in reason_counts],
+            "total": sum(r[1] for r in reason_counts),
         }
     except HTTPException:
         raise
@@ -871,19 +868,10 @@ def get_facility_performance(
                 detail="Only super admin can view this analytics"
             )
         
-        # Get facilities with aggregated performance metrics (eliminates N+1 query problem)
-        facility_ids = db.query(Facility.id).limit(limit).all()
-        facility_ids = [f[0] for f in facility_ids]
-        
-        # Use database aggregation instead of Python loops
-        performance_data = []
-        for facility_id in facility_ids:
-            facility = db.query(Facility).filter(Facility.id == facility_id).first()
-            if not facility:
-                continue
-            
-            # Single query: get all stats with database aggregation
-            referral_stats = db.query(
+        # Get facility performance metrics in a single grouped query to eliminate the N+1 problem
+        performance_query = (
+            db.query(
+                Facility.name.label("facility_name"),
                 func.count(Referral.id).label("total_referrals"),
                 func.sum(
                     case(
@@ -904,26 +892,27 @@ def get_facility_performance(
                         else_=None
                     )
                 ).label("avg_turnaround_days")
-            ).filter(
-                Referral.from_facility_id == facility_id
-            ).first()
-            
-            total_referrals = referral_stats.total_referrals or 0
-            completed_referrals = referral_stats.completed_referrals or 0
-            avg_turnaround = round(referral_stats.avg_turnaround_days or 0, 1)
-            
+            )
+            .join(Referral, Facility.id == Referral.from_facility_id, isouter=True)
+            .group_by(Facility.id, Facility.name)
+            .order_by(func.count(Referral.id).desc())
+            .limit(limit)
+        )
+
+        performance_data = []
+        for row in performance_query.all():
+            total_referrals = row.total_referrals or 0
+            completed_referrals = row.completed_referrals or 0
+            avg_turnaround = round(row.avg_turnaround_days or 0, 1)
             completion_rate = round((completed_referrals / max(total_referrals, 1)) * 100, 1)
             
             performance_data.append({
-                "facility": facility.name,
+                "facility": row.facility_name,
                 "total_referrals": total_referrals,
                 "completed_referrals": completed_referrals,
                 "completion_rate": completion_rate,
                 "avg_turnaround_days": avg_turnaround,
             })
-        
-        # Sort by completion rate descending
-        performance_data.sort(key=lambda x: x["completion_rate"], reverse=True)
         
         return {
             "data": performance_data,
@@ -1137,9 +1126,9 @@ def get_analytics_metrics(
                 )
             )
             # Filter patients by facility only
-            patient_query = db.query(Patient).filter(
-                Patient.facility_id == facility_id
-            ) if hasattr(Patient, 'facility_id') else db.query(Patient)
+            patient_query = db.query(Patient).join(PatientIdentifier).filter(
+                PatientIdentifier.facility_id == facility_id
+            )
             # Documents linked through referrals
             referral_ids = (
                 db.query(Referral.id)
