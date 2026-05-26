@@ -107,8 +107,8 @@ class NotificationService(NotificationEventCreators):
                 Notification.user_id == user_id,
                 and_(
                     Notification.user_id.is_(None),
-                    # Force PostgreSQL JSONB containment operator (@>)
-                    Notification.roles.contains(cast([user_role], JSON)),
+                    # Use standard JSON containment check which SQLAlchemy maps to @> for JSONB
+                    Notification.roles.contains([user_role]),
                 ),
             )
         )
