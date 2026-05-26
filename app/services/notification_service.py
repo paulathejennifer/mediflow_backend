@@ -107,7 +107,7 @@ class NotificationService(NotificationEventCreators):
                 Notification.user_id == user_id,
                 and_(
                     Notification.user_id.is_(None),
-                    # Correct JSON containment check for roles list
+                    # Standard SQLAlchemy JSON containment check
                     Notification.roles.contains([user_role]),
                 ),
             )
