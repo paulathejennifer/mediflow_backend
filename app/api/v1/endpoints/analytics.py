@@ -155,6 +155,9 @@ def get_dashboard_kpis(
                 and_(Patient.created_at >= prev_start_date, Patient.created_at < start_date)
             ).count()
             patient_trend = calculate_trend(new_patients_current, new_patients_prev)
+            
+            # New Patients This Month (for Patients Page)
+            new_patients_this_month = new_patients_current # Same as new_patients_current for 30-day window
 
             # Calculate User Trend
             total_users = db.query(User).count()
@@ -240,6 +243,8 @@ def get_dashboard_kpis(
                 "total_patients": total_patients,
                 "total_patients_trend": patient_trend,
                 "total_users": total_users,
+                "new_patients_this_month": new_patients_this_month,
+                "new_patients_this_month_trend": patient_trend, # Trend for new patients
                 "total_users_trend": user_trend,
                 "active_users": active_users_count,
                 "active_users_trend": active_trend,
@@ -283,6 +288,9 @@ def get_dashboard_kpis(
                 )
             ).count()
             patient_trend = calculate_trend(new_patients_current, new_patients_prev)
+
+            # New Patients This Month (for Patients Page)
+            new_patients_this_month = new_patients_current
 
             # Facility User Trend
             total_users = db.query(User).filter(User.facility_id == facility_id).count()
@@ -394,6 +402,8 @@ def get_dashboard_kpis(
                 "facility_name": facility.name if facility else "Unknown",
                 "total_patients": total_patients,
                 "total_patients_trend": patient_trend,
+                "new_patients_this_month": new_patients_this_month,
+                "new_patients_this_month_trend": patient_trend,
                 "total_users": total_users,
                 "total_users_trend": user_trend,
                 "active_users": active_users_count,

@@ -4,7 +4,8 @@ import { ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/solid';
 interface OverviewCardProps {
   title: string;
   value: number | string;
-  trend: number;
+  trend: number; // This is the percentage value
+  trendLabel?: string; // New prop for custom trend label
   icon: React.ReactNode;
   suffix?: string;
 }
@@ -33,9 +34,9 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({ title, value, trend,
           ) : (
             <ArrowDownIcon className="h-4 w-4 mr-1" />
           )}
-          {Math.abs(trend)}%
+          {Math.abs(trend).toFixed(1)}% {/* Ensure one decimal place */}
         </span>
-        <span className="ml-2 text-sm text-gray-400">vs last month</span>
+        <span className="ml-2 text-sm text-gray-400">{trendLabel || 'vs last month'}</span>
       </div>
     </div>
   );
