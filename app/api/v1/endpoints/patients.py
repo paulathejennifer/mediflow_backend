@@ -21,7 +21,7 @@ from app.enums import UserRole, AuditAction
 router = APIRouter()
 
 
-@router.post("/", response_model=PatientWithIdentifiers)
+@router.post("", response_model=PatientWithIdentifiers)
 def create_patient(
     patient_data: PatientCreate,
     db: Session = Depends(get_db),
@@ -98,7 +98,7 @@ def create_patient(
         )
 
 
-@router.get("/", response_model=List[PatientWithIdentifiers])
+@router.get("", response_model=List[PatientWithIdentifiers])
 def list_patients(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),

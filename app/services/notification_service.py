@@ -107,8 +107,8 @@ class NotificationService(NotificationEventCreators):
                 Notification.user_id == user_id,
                 and_(
                     Notification.user_id.is_(None),
-                    # PostgreSQL JSONB containment check (@>)
-                    Notification.roles.contains(cast([user_role], JSON)),
+                    # PostgreSQL JSONB containment check
+                    Notification.roles.contains([user_role]),
                 ),
             )
         )
@@ -575,7 +575,7 @@ class NotificationService(NotificationEventCreators):
     def monitor_storage_usage(self):
         """Monitor storage usage across facilities"""
 
-        facilities = self.db.query(Facility).filter(Facility.is_active == True).all()
+        facilities = self.db.query(Facility).filter(Facility.is_active == "true").all()
 
         for facility in facilities:
             # Check storage usage (placeholder implementation)

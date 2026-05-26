@@ -56,7 +56,7 @@ async def monitor_db_performance(db: Session):
             if error_rate > 0.10:
                 get_notification_service(db).create_database_performance_alert_notification(
                     error_rate=error_rate,
-                    details={"query_count": total_reqs, "slow_queries": errors}
+                    details={"query_count": int(total_reqs), "slow_queries": int(errors)}
                 )
     except Exception as e:
         logger.error(f"DB Performance Monitor Failed: {e}")
