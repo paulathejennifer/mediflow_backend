@@ -589,6 +589,9 @@ def get_system_activity_trend(
                 )
             )
 
+            # Filter patients by facility
+            patient_query = patient_query.filter(Patient.facility_id == facility_id)
+
             # Corrected subquery for referral IDs
             referral_ids = db.query(Referral.id).filter(
                 or_(
@@ -609,6 +612,7 @@ def get_system_activity_trend(
             # Count using database aggregation
             patients_count = patient_query.filter(
                 patient_query.created_at >= month_start,
+                Patient.created_at >= month_start,
                 Patient.created_at < month_end,
             ).count()
             
@@ -627,6 +631,7 @@ def get_system_activity_trend(
             monthly_data.append({
                 "month": month_label,
                 "patients": patients_count,
+                "referrals": referrals_count,
                 "documents": documents_count,
             })
         
