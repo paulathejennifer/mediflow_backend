@@ -426,7 +426,7 @@ RECOMMENDED ACTIONS:
             "document_ai": self.document_ai.get_service_info(),
             "integration_status": {
                 "groq_configured": self.text_ai.client is not None,
-                "speech_service_ready": hasattr(self.speech_ai, 'recognizer'),
+                "speech_service_ready": getattr(self.speech_ai, 'recognizer', None) is not None,
                 "tesseract_available": self.document_ai.tesseract_available,
             },
             "capabilities": {

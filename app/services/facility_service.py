@@ -496,7 +496,7 @@ class FacilityService:
             self.db.query(Facility)
             .filter(
                 and_(
-                    Facility.is_active == True,
+                    Facility.is_active == "true",
                     or_(
                         Facility.name.ilike(search_term),
                         Facility.facility_code.ilike(search_term),

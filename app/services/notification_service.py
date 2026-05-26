@@ -107,8 +107,8 @@ class NotificationService(NotificationEventCreators):
                 Notification.user_id == user_id,
                 and_(
                     Notification.user_id.is_(None),
-                    # PostgreSQL JSONB containment check
-                    Notification.roles.contains([user_role]),
+                    # PostgreSQL JSONB containment check (@>) - force cast to avoid LIKE operator error
+                    Notification.roles.contains(cast([user_role], JSON)),
                 ),
             )
         )
