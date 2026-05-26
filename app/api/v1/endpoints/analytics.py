@@ -613,6 +613,7 @@ def get_system_activity_trend(
             ).count()
             
             referrals_count = referral_query.filter(
+            referrals_count = referral_query.filter(
                 Referral.created_at >= month_start,
                 Referral.created_at < month_end,
             ).count()
@@ -620,6 +621,7 @@ def get_system_activity_trend(
             documents_count = document_query.filter(
                 ReferralDocument.created_at >= month_start,
                 ReferralDocument.created_at < month_end,
+            ).count()
             ).count()
             
             monthly_data.append({

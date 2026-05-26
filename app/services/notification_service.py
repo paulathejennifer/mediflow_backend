@@ -108,6 +108,7 @@ class NotificationService(NotificationEventCreators):
                 and_(
                     Notification.user_id.is_(None),
                     # Standard JSON containment check for roles list
+                    # Correct JSON containment check for roles list
                     Notification.roles.contains([user_role]),
                 ),
             )
