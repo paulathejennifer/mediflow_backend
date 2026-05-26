@@ -631,10 +631,11 @@ class ReferralService:
                 "status": referral_summary["referral_info"]["status"],
             }
 
-            # Generate AI summary (async in production)
-            import asyncio
-
-            summary_result = asyncio.run(ai_service.generate_referral_summary(context))
+            # Fix: Do not use asyncio.run() inside a running loop. 
+            # Since this is a service method, we'll run it in the background
+            # to avoid blocking the request cycle.
+            loop = asyncio.get_event_loop()
+            summary_result = loop.run_until_complete(ai_service.generate_referral_summary(context))
 
             # Update referral with AI summary
             referral = self.get_referral_by_id(referral_id)
