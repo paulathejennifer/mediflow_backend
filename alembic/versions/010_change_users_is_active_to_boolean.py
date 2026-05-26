@@ -16,10 +16,21 @@ depends_on = None
 
 
 def upgrade():
-    # Convert textual 'true'/'false' values to boolean
-    op.execute("ALTER TABLE users ALTER COLUMN is_active TYPE boolean USING (is_active::boolean);")
+    conn = op.get_bind()
+    if conn.dialect.name == 'postgresql':
+        # PostgreSQL specific cast using the USING clause for both tables
+        op.execute('ALTER TABLE users ALTER COLUMN is_active TYPE BOOLEAN USING is_active::boolean')
+        op.execute('ALTER TABLE facilities ALTER COLUMN is_active TYPE BOOLEAN USING is_active::boolean')
+        
+        # Set default values to ensure new records are active by default
+        op.execute('ALTER TABLE users ALTER COLUMN is_active SET DEFAULT true')
+        op.execute('ALTER TABLE facilities ALTER COLUMN is_active SET DEFAULT true')
+    # SQLite is already Boolean from 001_initial, no action needed
 
 
 def downgrade():
-    # Revert to varchar
-    op.execute("ALTER TABLE users ALTER COLUMN is_active TYPE varchar USING (CASE WHEN is_active THEN 'true' ELSE 'false' END);")
+    conn = op.get_bind()
+    if conn.dialect.name == 'postgresql':
+        # Revert columns to VARCHAR if necessary
+        op.execute('ALTER TABLE users ALTER COLUMN is_active TYPE VARCHAR USING is_active::text')
+        op.execute('ALTER TABLE facilities ALTER COLUMN is_active TYPE VARCHAR USING is_active::text')

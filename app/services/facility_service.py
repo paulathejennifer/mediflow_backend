@@ -224,7 +224,7 @@ class FacilityService:
                 detail="Facility is already deactivated",
             )
 
-        facility.is_active = False
+        facility.is_active = "false"
         self.db.commit()
         self.db.refresh(facility)
 
@@ -253,7 +253,7 @@ class FacilityService:
                 detail="Facility is already active",
             )
 
-        facility.is_active = True
+        facility.is_active = "true"
         self.db.commit()
         self.db.refresh(facility)
 
@@ -280,7 +280,7 @@ class FacilityService:
         Returns:
             List of facilities
         """
-        query = self.db.query(Facility).filter(Facility.is_active == True)
+        query = self.db.query(Facility).filter(Facility.is_active == "true")
 
         if county:
             query = query.filter(Facility.county.ilike(f"%{county}%"))
@@ -307,7 +307,7 @@ class FacilityService:
             List of users in the facility
         """
         query = self.db.query(User).filter(
-            and_(User.facility_id == facility_id, User.is_active == True)
+            and_(User.facility_id == facility_id, User.is_active == "true")
         )
 
         if role:
@@ -337,7 +337,7 @@ class FacilityService:
         )
         active_users = (
             self.db.query(User)
-            .filter(and_(User.facility_id == facility_id, User.is_active == True))
+            .filter(and_(User.facility_id == facility_id, User.is_active == "true"))
             .count()
         )
 
@@ -350,7 +350,7 @@ class FacilityService:
                     and_(
                         User.facility_id == facility_id,
                         User.role == role.value,
-                        User.is_active == True,
+                        User.is_active == "true",
                     )
                 )
                 .count()
@@ -388,12 +388,12 @@ class FacilityService:
                             Referral.from_facility_id == facility_id,
                             Referral.to_facility_id == facility_id,
                         ),
-                        Referral.status == http_status.value,
+                        Referral.status == status.value,
                     )
                 )
                 .count()
             )
-            referral_status_stats[http_status.value] = status_count
+            referral_status_stats[status.value] = status_count
 
         return {
             "facility_info": {

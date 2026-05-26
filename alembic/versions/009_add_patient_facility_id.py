@@ -17,8 +17,14 @@ depends_on = None
 
 
 def upgrade():
-    # Add nullable facility_id to patients to reconcile prod schema drift
-    op.add_column('patients', sa.Column('facility_id', sa.Integer(), nullable=True))
+    # Check if column exists first to avoid "duplicate column" error
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [c['name'] for c in inspector.get_columns('patients')]
+    
+    if 'facility_id' not in columns:
+        op.add_column('patients', sa.Column('facility_id', sa.Integer(), nullable=True))
+
     try:
         op.create_index(op.f('ix_patients_facility_id'), 'patients', ['facility_id'], unique=False)
     except Exception:

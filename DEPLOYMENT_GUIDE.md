@@ -13,10 +13,10 @@
    - Navigate to the mediflow-backend environment
    - Add/Update environment variables:
    ```
-   ALLOWED_HOSTS=["https://your-vercel-app.vercel.app","http://localhost:3000"]
-   FRONTEND_URL=https://your-vercel-app.vercel.app
+   ALLOWED_HOSTS=["https://mediflow-frontend-omega.vercel.app","http://localhost:3000"]
+   FRONTEND_URL=https://mediflow-frontend-omega.vercel.app
    ```
-   - Replace `your-vercel-app` with your actual Vercel project name
+   The frontend is currently deployed at `https://mediflow-frontend-omega.vercel.app`
    - Redeploy the backend after updating
 
 2. **Verify Database**

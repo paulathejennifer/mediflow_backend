@@ -194,7 +194,7 @@ class UserService:
                 detail="User is already deactivated",
             )
 
-        user.is_active = False
+        user.is_active = "false"
         self.db.commit()
         self.db.refresh(user)
 
@@ -222,7 +222,7 @@ class UserService:
                 status_code=status.HTTP_400_BAD_REQUEST, detail="User is already active"
             )
 
-        user.is_active = True
+        user.is_active = "true"
         self.db.commit()
         self.db.refresh(user)
 
@@ -288,7 +288,7 @@ class UserService:
             query = query.filter(User.facility_id == facility_id)
 
         total_users = query.count()
-        active_users = query.filter(User.is_active == True).count()
+        active_users = query.filter(User.is_active == "true").count()
 
         # Count by role
         role_stats = {}

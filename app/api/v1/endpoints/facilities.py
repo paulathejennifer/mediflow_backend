@@ -75,7 +75,8 @@ def list_facilities(
     current_user: User = Depends(get_current_user),
 ):
     """List facilities with optional filters."""
-    query = db.query(Facility).filter(Facility.is_active == True)
+    # PostgreSQL VARCHAR mismatch fix: compare to string literal
+    query = db.query(Facility).filter(Facility.is_active == "true")
 
     # Apply filters
     if county:
@@ -190,7 +191,7 @@ def deactivate_facility(
         )
 
     try:
-        facility.is_active = False
+        facility.is_active = "false"
         db.commit()
 
         # Log deactivation
