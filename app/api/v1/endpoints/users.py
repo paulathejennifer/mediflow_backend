@@ -15,6 +15,7 @@ from app.services.notification_service import get_notification_service
 router = APIRouter()
 
 
+@router.post("", response_model=UserResponse)
 @router.post("/", response_model=UserResponse)
 def create_user(
     user_data: UserCreate,
@@ -85,6 +86,7 @@ def create_user(
         )
 
 
+@router.get("", response_model=List[UserResponse])
 @router.get("/", response_model=List[UserResponse])
 def list_users(
     skip: int = Query(0, ge=0),

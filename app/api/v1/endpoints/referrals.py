@@ -22,6 +22,7 @@ from app.services.notification_service import get_notification_service
 router = APIRouter()
 
 
+@router.post("", response_model=ReferralResponse)
 @router.post("/", response_model=ReferralResponse)
 def create_referral(
     referral_data: ReferralCreate,
@@ -126,6 +127,7 @@ def create_referral(
         )
 
 
+@router.get("", response_model=List[ReferralSummary])
 @router.get("/", response_model=List[ReferralSummary])
 def list_referrals(
     skip: int = Query(0, ge=0),

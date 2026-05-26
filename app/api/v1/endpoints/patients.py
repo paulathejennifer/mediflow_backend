@@ -16,7 +16,7 @@ from app.models.patient_identifier import PatientIdentifier
 from app.models.facility import Facility
 from app.models.user import User
 from app.services.mrn_service import MRNService
-from app.enums import UserRole, AuditAction, AuditAction
+from app.enums import UserRole, AuditAction
 
 router = APIRouter()
 
@@ -111,21 +111,26 @@ def list_patients(
     """List patients accessible to the current user."""
     permission_checker = get_permission_checker(current_user, db)
 
-    # Get facility
-    facility = (
-        db.query(Facility).filter(Facility.id == current_user.facility_id).first()
-    )
-    if not facility:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Facility not found"
+    # Super admin can see all patients, others see facility-specific
+    if current_user.role == UserRole.SUPER_ADMIN:
+        query = db.query(Patient)
+        facility = None
+    else:
+        # Get facility
+        facility = (
+            db.query(Facility).filter(Facility.id == current_user.facility_id).first()
         )
+        if not facility:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Facility not found"
+            )
 
-    # Base query - get patients from user's facility
-    query = (
-        db.query(Patient)
-        .join(PatientIdentifier)
-        .filter(PatientIdentifier.facility_id == current_user.facility_id)
-    )
+        # Base query - get patients from user's facility
+        query = (
+            db.query(Patient)
+            .join(PatientIdentifier)
+            .filter(PatientIdentifier.facility_id == current_user.facility_id)
+        )
 
     # Apply search filter
     if search:
@@ -141,20 +146,24 @@ def list_patients(
     # Load identifiers for each patient
     result = []
     for patient in patients:
-        # Get identifiers for this patient from user's facility
-        identifiers = (
-            db.query(PatientIdentifier)
-            .filter(
-                PatientIdentifier.patient_id == patient.id,
-                PatientIdentifier.facility_id == current_user.facility_id,
-            )
-            .all()
-        )
+        # For Super Admin, we show all identifiers. For others, just their facility.
+        id_query = db.query(PatientIdentifier).filter(PatientIdentifier.patient_id == patient.id)
+        if current_user.role != UserRole.SUPER_ADMIN:
+            id_query = id_query.filter(PatientIdentifier.facility_id == current_user.facility_id)
+        
+        identifiers = id_query.all()
 
-        # Populate facility info for each identifier
+        # Populate facility info
         for identifier in identifiers:
-            identifier.facility_name = facility.name
-            identifier.facility_code = facility.facility_code
+            if facility:
+                identifier.facility_name = facility.name
+                identifier.facility_code = facility.facility_code
+            else:
+                # Fetch facility info for Super Admin view
+                fac = db.query(Facility).filter(Facility.id == identifier.facility_id).first()
+                if fac:
+                    identifier.facility_name = fac.name
+                    identifier.facility_code = fac.facility_code
 
         patient.identifiers = identifiers
         result.append(patient)

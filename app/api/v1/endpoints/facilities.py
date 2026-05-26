@@ -20,6 +20,7 @@ from app.services.facility_service import FacilityService
 router = APIRouter()
 
 
+@router.post("", response_model=FacilityResponse)
 @router.post("/", response_model=FacilityResponse)
 def create_facility(
     facility_data: FacilityCreate,
@@ -64,6 +65,7 @@ def create_facility(
         )
 
 
+@router.get("", response_model=List[FacilitySummary])
 @router.get("/", response_model=List[FacilitySummary])
 def list_facilities(
     skip: int = Query(0, ge=0),
