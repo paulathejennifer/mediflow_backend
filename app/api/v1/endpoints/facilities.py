@@ -79,6 +79,8 @@ def list_facilities(
     """List facilities with optional filters."""
     # PostgreSQL VARCHAR mismatch fix: compare to string literal
     query = db.query(Facility).filter(Facility.is_active == "true")
+    # Correct Boolean comparison for PostgreSQL
+    query = db.query(Facility).filter(Facility.is_active == True)
 
     # Apply filters
     if county:

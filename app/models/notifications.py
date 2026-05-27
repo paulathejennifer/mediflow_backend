@@ -39,6 +39,7 @@ class NotificationDelivery(Base):
     delivery_method = Column(String, default="websocket")
     delivery_status = Column(String, default="pending")
     delivered_at = Column(DateTime(timezone=True), nullable=True)
+    read_at = Column(DateTime(timezone=True), nullable=True)
     action_taken = Column(String, nullable=True)
     action_result = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

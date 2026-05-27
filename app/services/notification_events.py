@@ -264,6 +264,8 @@ class NotificationEventCreators:
                 "patient_name": patient_name,
                 "patient_age": patient.age if patient else "Unknown",
                 "conditions": patient.conditions if patient else [],
+                "patient_dob": patient.date_of_birth.isoformat() if patient else "Unknown",
+                "chronic_conditions": patient.chronic_conditions if patient else "None",
                 "priority": referral.priority,
                 "from_facility": from_facility.name if from_facility else "Unknown",
                 "urgency_level": referral.priority,

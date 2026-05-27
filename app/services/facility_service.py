@@ -225,6 +225,7 @@ class FacilityService:
             )
 
         facility.is_active = "false"
+        facility.is_active = False
         self.db.commit()
         self.db.refresh(facility)
 
@@ -254,6 +255,7 @@ class FacilityService:
             )
 
         facility.is_active = "true"
+        facility.is_active = True
         self.db.commit()
         self.db.refresh(facility)
 
