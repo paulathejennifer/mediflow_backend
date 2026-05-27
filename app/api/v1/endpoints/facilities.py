@@ -277,8 +277,12 @@ def hard_delete_facility(
             db.query(VoiceNote).filter(VoiceNote.referral_id.in_(referral_ids)).delete(synchronize_session=False)
             db.query(Referral).filter(Referral.id.in_(referral_ids)).delete(synchronize_session=False)
 
-        # 4. Finally delete the facility
-        db.delete(facility)
+        # 4. Finally delete the facility via query
+        # Using a query-based delete bypasses SQLAlchemy's object-level cascade logic,
+        # which was triggering a SELECT on patient_identifiers and failing due to
+        # the missing 'identifier_type' column in the database.
+        db.query(Facility).filter(Facility.id == facility_id).delete(synchronize_session=False)
+
         db.commit()
         return {"message": "Facility and all associated clinical data permanently deleted"}
     except Exception as e:
