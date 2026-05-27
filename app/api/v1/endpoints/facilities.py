@@ -228,7 +228,7 @@ def hard_delete_facility(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Permanently delete a facility (Super Admin only)."""
+    """Permanently delete a facility and all associated records (Super Admin only)."""
     if current_user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -242,12 +242,45 @@ def hard_delete_facility(
         )
 
     try:
-        # Note: In a real production environment, you would need to handle 
-        # or clean up related users, referrals, and patient identifiers 
-        # before this hard delete can succeed due to foreign key constraints.
+        # 1. Unlink users from this facility
+        db.query(User).filter(User.facility_id == facility_id).update(
+            {User.facility_id: None}, synchronize_session=False
+        )
+
+        # 2. Delete patient identifiers
+        # Using synchronize_session=False to execute a direct SQL DELETE,
+        # which avoids loading objects and bypassing potential schema mismatches.
+        from app.models.patient_identifier import PatientIdentifier
+
+        db.query(PatientIdentifier).filter(
+            PatientIdentifier.facility_id == facility_id
+        ).delete(synchronize_session=False)
+
+        # 3. Clean up Referrals and their dependencies
+        from app.models.referral import Referral
+        from app.models.referral_document import ReferralDocument
+        from app.models.voice_note import VoiceNote
+
+        # Identify all referrals involving this facility
+        referral_ids = [
+            r.id
+            for r in db.query(Referral.id)
+            .filter(
+                (Referral.from_facility_id == facility_id)
+                | (Referral.to_facility_id == facility_id)
+            )
+            .all()
+        ]
+
+        if referral_ids:
+            db.query(ReferralDocument).filter(ReferralDocument.referral_id.in_(referral_ids)).delete(synchronize_session=False)
+            db.query(VoiceNote).filter(VoiceNote.referral_id.in_(referral_ids)).delete(synchronize_session=False)
+            db.query(Referral).filter(Referral.id.in_(referral_ids)).delete(synchronize_session=False)
+
+        # 4. Finally delete the facility
         db.delete(facility)
         db.commit()
-        return {"message": "Facility permanently deleted"}
+        return {"message": "Facility and all associated clinical data permanently deleted"}
     except Exception as e:
         db.rollback()
         raise HTTPException(
