@@ -30,11 +30,11 @@ class NotificationEventCreators:
         return self.create_notification(
             notification_type="info",
             title=f"✨ New Facility Created: {facility.name}",
-            message=f"A new {facility.facility_type or 'healthcare'} facility has been registered in the system",
+            message=f"A new {facility.type or 'healthcare'} facility has been registered in the system",
             details={
                 "facility_id": facility.id,
                 "facility_name": facility.name,
-                "facility_type": facility.facility_type,
+                "facility_type": facility.type,
                 "county": facility.county,
                 "created_by": created_by_user_id,
                 "created_at": datetime.now(timezone.utc).isoformat(),
@@ -75,13 +75,14 @@ class NotificationEventCreators:
         self, user: User, facility: Facility
     ):
         """SA003: Facility Admin Assigned"""
+        full_name = f"{user.first_name} {user.last_name}"
         return self.create_notification(
             notification_type="info",
-            title=f"👤 New Facility Admin: {user.name}",
-            message=f"{user.name} has been assigned as admin for {facility.name}",
+            title=f"👤 New Facility Admin: {full_name}",
+            message=f"{full_name} has been assigned as admin for {facility.name}",
             details={
                 "user_id": user.id,
-                "user_name": user.name,
+                "user_name": full_name,
                 "user_email": user.email,
                 "facility_id": facility.id,
                 "facility_name": facility.name,
@@ -251,15 +252,16 @@ class NotificationEventCreators:
         
         emoji = priority_emoji.get(referral.priority, "📋")
         patient = referral.patient if referral.patient else None
+        patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
         from_facility = referral.from_facility if referral.from_facility else None
         
         return self.create_notification(
             notification_type="critical" if referral.priority == Priority.EMERGENCY.value else "info",
-            title=f"{emoji} New Referral: {patient.name if patient else 'Patient'} ({referral.priority})",
+            title=f"{emoji} New Referral: {patient_name} ({referral.priority})",
             message=f"Incoming patient referral from {from_facility.name if from_facility else 'Referring Facility'}",
             details={
                 "patient_id": referral.patient_id,
-                "patient_name": patient.name if patient else "Unknown",
+                "patient_name": patient_name,
                 "patient_age": patient.age if patient else "Unknown",
                 "conditions": patient.conditions if patient else [],
                 "priority": referral.priority,
@@ -282,15 +284,17 @@ class NotificationEventCreators:
         """FA002: Referral Accepted"""
         from_facility = referral.from_facility if referral.from_facility else None
         patient = referral.patient if referral.patient else None
+        patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+        physician_name = f"{accepted_by_user.first_name} {accepted_by_user.last_name}"
         
         return self.create_notification(
             notification_type="info",
-            title=f"✅ Referral Accepted: {patient.name if patient else 'Patient'}",
-            message=f"Your referral has been accepted by {accepted_by_user.name}",
+            title=f"✅ Referral Accepted: {patient_name}",
+            message=f"Your referral has been accepted by {physician_name}",
             details={
                 "patient_id": referral.patient_id,
                 "receiving_facility": referral.to_facility.name if referral.to_facility else "Unknown",
-                "accepting_physician_name": accepted_by_user.name,
+                "accepting_physician_name": physician_name,
                 "accepted_at": referral.accepted_at.isoformat() if referral.accepted_at else datetime.now(timezone.utc).isoformat(),
                 "eta": "2 hours",
                 "accepting_facility_contact": referral.to_facility.contact_phone if referral.to_facility else "",
@@ -307,10 +311,11 @@ class NotificationEventCreators:
         """FA003: Referral Rejected"""
         from_facility = referral.from_facility if referral.from_facility else None
         patient = referral.patient if referral.patient else None
+        patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
         
         return self.create_notification(
             notification_type="warning",
-            title=f"❌ Referral Rejected: {patient.name if patient else 'Patient'}",
+            title=f"❌ Referral Rejected: {patient_name}",
             message=f"Your referral has been rejected. Reason: {rejection_reason[:100]}",
             details={
                 "patient_id": referral.patient_id,
@@ -331,11 +336,12 @@ class NotificationEventCreators:
     ):
         """FA004: Referral In Transit"""
         patient = referral.patient if referral.patient else None
+        patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
         to_facility = referral.to_facility if referral.to_facility else None
         
         return self.create_notification(
             notification_type="info",
-            title=f"🚑 Patient In Transit: {patient.name if patient else 'Patient'}",
+            title=f"🚑 Patient In Transit: {patient_name}",
             message=f"Patient is being transferred to {to_facility.name if to_facility else 'receiving facility'}",
             details={
                 "patient_id": referral.patient_id,
@@ -356,10 +362,11 @@ class NotificationEventCreators:
     ):
         """FA005: Referral Received"""
         patient = referral.patient if referral.patient else None
+        patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
         
         return self.create_notification(
             notification_type="info",
-            title=f"🏥 Patient Arrived: {patient.name if patient else 'Patient'}",
+            title=f"🏥 Patient Arrived: {patient_name}",
             message=f"Patient has been admitted to the facility",
             details={
                 "patient_id": referral.patient_id,
@@ -379,10 +386,11 @@ class NotificationEventCreators:
     ):
         """FA006: Referral Completed"""
         patient = referral.patient if referral.patient else None
+        patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
         
         return self.create_notification(
             notification_type="info",
-            title=f"🎉 Referral Completed: {patient.name if patient else 'Patient'}",
+            title=f"🎉 Referral Completed: {patient_name}",
             message="Care pathway has been completed successfully",
             details={
                 "patient_id": referral.patient_id,
@@ -402,10 +410,11 @@ class NotificationEventCreators:
     ):
         """FA007: Referral SLA Breached"""
         patient = referral.patient if referral.patient else None
+        patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
         
         return self.create_notification(
             notification_type="warning",
-            title=f"⏰ SLA Breached: {patient.name if patient else 'Patient'}",
+            title=f"⏰ SLA Breached: {patient_name}",
             message=f"Processing time ({current_time_hours:.1f}h) exceeds SLA target ({sla_target})",
             details={
                 "patient_id": referral.patient_id,
@@ -424,14 +433,15 @@ class NotificationEventCreators:
         self, referral_id: int, document_count: int, uploader: User
     ):
         """FA008: Patient Documents Uploaded"""
+        uploader_name = f"{uploader.first_name} {uploader.last_name}"
         return self.create_notification(
             notification_type="info",
             title=f"📄 Documents Uploaded ({document_count} files)",
-            message=f"{uploader.name} uploaded {document_count} document(s) for this patient",
+            message=f"{uploader_name} uploaded {document_count} document(s) for this patient",
             details={
                 "referral_id": referral_id,
                 "document_count": document_count,
-                "uploader": uploader.name,
+                "uploader": uploader_name,
                 "uploader_id": uploader.id,
                 "upload_time": datetime.now(timezone.utc).isoformat(),
                 "total_file_size": "8.5 MB",
@@ -656,13 +666,14 @@ class NotificationEventCreators:
         self, user: User, facility: Facility
     ):
         """FA101: Clinician Created"""
+        full_name = f"{user.first_name} {user.last_name}"
         return self.create_notification(
             notification_type="info",
-            title=f"👤 New Clinician Added: {user.name}",
-            message=f"New clinician {user.name} has been created for your facility",
+            title=f"👤 New Clinician Added: {full_name}",
+            message=f"New clinician {full_name} has been created for your facility",
             details={
                 "user_id": user.id,
-                "user_name": user.name,
+                "user_name": full_name,
                 "user_email": user.email,
                 "specialization": user.specialization if hasattr(user, 'specialization') else "General",
                 "facility_id": facility.id,
@@ -680,13 +691,14 @@ class NotificationEventCreators:
         self, user: User, changed_fields: List[str]
     ):
         """FA102: Clinician Updated"""
+        full_name = f"{user.first_name} {user.last_name}"
         return self.create_notification(
             notification_type="info",
-            title=f"🔄 Clinician Profile Updated: {user.name}",
-            message=f"Clinician {user.name}'s profile has been updated",
+            title=f"🔄 Clinician Profile Updated: {full_name}",
+            message=f"Clinician {full_name}'s profile has been updated",
             details={
                 "user_id": user.id,
-                "user_name": user.name,
+                "user_name": full_name,
                 "changed_fields": changed_fields,
                 "new_permissions": ["manage_patients", "view_analytics"],
                 "old_permissions": ["view_patients"],
