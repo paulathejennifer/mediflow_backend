@@ -13,6 +13,7 @@ class FacilityBase(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     is_active: Optional[bool] = True
+    performance_score: Optional[float] = 0.0
 
 
 class FacilityCreate(FacilityBase):
@@ -46,6 +47,7 @@ class FacilitySummary(BaseModel):
     type: str
     level: str
     county: str
+    performance_score: float = 0.0
 
     class Config:
         from_attributes = True

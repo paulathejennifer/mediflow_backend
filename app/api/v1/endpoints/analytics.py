@@ -14,6 +14,7 @@ from app.models.referral_document import ReferralDocument
 from app.enums import UserRole, ReferralStatus, Priority
 from sqlalchemy import and_, or_, func, extract, case
 from sqlalchemy.sql import label
+from app.services.analytics_service import get_analytics_service
 
 logger = logging.getLogger(__name__)
 
@@ -1131,77 +1132,10 @@ def get_api_requests(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only super admin can view API request statistics"
             )
-        
-        # Estimate based on system activity
-        start_date = datetime.utcnow() - timedelta(days=days)
-        
-        # Count various activities as proxy for API requests
-        referrals_count = db.query(func.count(Referral.id)).filter(
-            Referral.created_at >= start_date
-        ).scalar() or 0
-        patients_count = db.query(func.count(Patient.id)).filter(
-            Patient.created_at >= start_date
-        ).scalar() or 0
-        documents_count = db.query(func.count(ReferralDocument.id)).filter(
-            ReferralDocument.created_at >= start_date
-        ).scalar() or 0
-        
-        # Estimate total API requests
-        estimated_requests = (referrals_count * 5) + (patients_count * 3) + (documents_count * 4)
-        
-        # Calculate for last 24 hours
-        last_24h = datetime.utcnow() - timedelta(days=1)
-        referrals_24h = db.query(func.count(Referral.id)).filter(
-            Referral.created_at >= last_24h
-        ).scalar() or 0
-        patients_24h = db.query(func.count(Patient.id)).filter(
-            Patient.created_at >= last_24h
-        ).scalar() or 0
-        documents_24h = db.query(func.count(ReferralDocument.id)).filter(
-            ReferralDocument.created_at >= last_24h
-        ).scalar() or 0
-        
-        estimated_24h = (referrals_24h * 5) + (patients_24h * 3) + (documents_24h * 4)
-        
-        # Calculate trend (compare to previous period)
-        previous_start = start_date - timedelta(days=days)
-        previous_end = start_date
-        
-        previous_referrals = db.query(func.count(Referral.id)).filter(
-            and_(
-                Referral.created_at >= previous_start,
-                Referral.created_at < previous_end
-            )
-        ).scalar() or 0
-        previous_patients = db.query(func.count(Patient.id)).filter(
-            and_(
-                Patient.created_at >= previous_start,
-                Patient.created_at < previous_end
-            )
-        ).scalar() or 0
-        previous_documents = db.query(func.count(ReferralDocument.id)).filter(
-            and_(
-                ReferralDocument.created_at >= previous_start,
-                ReferralDocument.created_at < previous_end
-            )
-        ).scalar() or 0
-        
-        estimated_previous = (previous_referrals * 5) + (previous_patients * 3) + (previous_documents * 4)
-        
-        trend = 0
-        if estimated_previous > 0:
-            trend = round(((estimated_requests - estimated_previous) / estimated_previous) * 100, 1)
-        
-        return {
-            "totalRequests": estimated_requests,
-            "requestsLast24h": estimated_24h,
-            "trend": trend,
-            "breakdown": {
-                "referrals": referrals_count,
-                "patients": patients_count,
-                "documents": documents_count,
-            }
-        }
+
+        service = get_analytics_service(db)
+        return service.get_real_api_request_count(days=days)
+
     except HTTPException:
         raise
     except Exception as e:
