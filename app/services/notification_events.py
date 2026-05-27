@@ -35,7 +35,7 @@ class NotificationEventCreators:
                 "facility_id": facility.id,
                 "facility_name": facility.name,
                 "facility_type": facility.facility_type,
-                "location": facility.location,
+                "county": facility.county,
                 "created_by": created_by_user_id,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             },
