@@ -220,3 +220,37 @@ def deactivate_facility(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to deactivate facility: {str(e)}",
         )
+
+
+@router.delete("/{facility_id}/hard")
+def hard_delete_facility(
+    facility_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete a facility (Super Admin only)."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can permanently delete facilities",
+        )
+
+    facility = db.query(Facility).filter(Facility.id == facility_id).first()
+    if not facility:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Facility not found"
+        )
+
+    try:
+        # Note: In a real production environment, you would need to handle 
+        # or clean up related users, referrals, and patient identifiers 
+        # before this hard delete can succeed due to foreign key constraints.
+        db.delete(facility)
+        db.commit()
+        return {"message": "Facility permanently deleted"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete facility: {str(e)}",
+        )
