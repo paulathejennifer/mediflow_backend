@@ -224,7 +224,6 @@ class FacilityService:
                 detail="Facility is already deactivated",
             )
 
-        facility.is_active = "false"
         facility.is_active = False
         self.db.commit()
         self.db.refresh(facility)
@@ -254,7 +253,6 @@ class FacilityService:
                 detail="Facility is already active",
             )
 
-        facility.is_active = "true"
         facility.is_active = True
         self.db.commit()
         self.db.refresh(facility)
