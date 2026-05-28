@@ -20,6 +20,7 @@ from app.services.ai_service import AIService
 from app.enums import ReferralStatus, Priority, UserRole
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+import asyncio
 
 
 class ReferralService:
@@ -483,8 +484,8 @@ class ReferralService:
         # Average processing time (submitted to accepted)
         processing_times = []
         accepted_referrals = base_query.filter(
-            and_(
-                Referral.status == ReferralStatus.ACCEPTED,
+            and_(  # Ensure comparison is with the value of the enum
+                Referral.status == ReferralStatus.ACCEPTED.value,
                 Referral.updated_at >= start_date,
             )
         ).all()
@@ -634,9 +635,14 @@ class ReferralService:
             # Fix: Do not use asyncio.run() inside a running loop. 
             # Since this is a service method, we'll run it in the background
             # to avoid blocking the request cycle.
-            loop = asyncio.get_event_loop()
-            summary_result = loop.run_until_complete(ai_service.generate_referral_summary(context))
+            asyncio.create_task(self._run_ai_summarization(referral_id, context))
+        except Exception as e:
+            print(f"AI trigger failed: {e}")
 
+    async def _run_ai_summarization(self, referral_id: int, context: Dict[str, Any]) -> None:
+        try:
+            ai_service = AIService(self.db)
+            summary_result = await ai_service.generate_referral_summary(context)
             # Update referral with AI summary
             referral = self.get_referral_by_id(referral_id)
             referral.ai_summary = summary_result.get("summary", "")

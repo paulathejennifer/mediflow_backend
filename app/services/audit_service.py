@@ -107,7 +107,7 @@ class AuditService:
             action=action,
             entity_type=entity_type,
             entity_id=entity_id,
-            details=json.dumps(details) if details else None,
+            details=details,
             ip_address=ip_address,
             user_agent=user_agent,
         )
@@ -391,7 +391,7 @@ class AuditService:
         logs = self.db.query(AuditLog).filter(AuditLog.created_at >= start_date).all()
 
         # Anomaly 1: Unusual login patterns (multiple failed logins)
-        failed_logins_by_user = {}
+        failed_logins_by_user: Dict[int, int] = {}
         for log in logs:
             if log.action == "login_failed":
                 user_id = log.user_id

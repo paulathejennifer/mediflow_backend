@@ -345,7 +345,7 @@ def verify_code(request: VerifyCodeRequest, db: Session = Depends(get_db)):
             audit_logger = create_audit_logger(db)
             audit_logger.log_action(
                 user_id=user.id,
-                action=AuditAction.UPDATE,
+                action=AuditAction.UPDATE.value,
                 entity_type="user",
                 entity_id=user.id,
                 details={"action": "code_verification_attempt"},

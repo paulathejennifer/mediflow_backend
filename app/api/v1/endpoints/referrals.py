@@ -288,7 +288,7 @@ def update_referral(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPDATE,
+            action=AuditAction.UPDATE.value,
             entity_type="referral",
             entity_id=referral.id,
             details=update_data,
@@ -340,7 +340,7 @@ async def submit_referral(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPDATE,
+            action=AuditAction.UPDATE.value,
             entity_type="referral",
             entity_id=referral.id,
             details={"action": "submit", "status": ReferralStatus.SUBMITTED},
