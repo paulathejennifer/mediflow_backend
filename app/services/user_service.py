@@ -101,7 +101,7 @@ class UserService:
         audit_logger = create_audit_logger(self.db)
         audit_logger.log_action(
             user_id=creator_id,
-            action=AuditAction.CREATE,
+            action=AuditAction.CREATE.value,
             entity_type="user",
             entity_id=user.id,
             details={"email": user.email, "role": user.role}

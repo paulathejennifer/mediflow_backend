@@ -17,7 +17,7 @@ router = APIRouter()
 
 @router.post("", response_model=UserResponse)
 @router.post("/", response_model=UserResponse)
-def create_user(
+async def create_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -55,7 +55,7 @@ def create_user(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.CREATE,
+            action=AuditAction.CREATE.value,
             entity_type="user",
             entity_id=user.id,
             details={
@@ -235,7 +235,7 @@ def deactivate_user(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.DELETE,
+            action=AuditAction.DELETE.value,
             entity_type="user",
             entity_id=user.id,
             details={"action": "deactivate", "email": user.email, "role": user.role},

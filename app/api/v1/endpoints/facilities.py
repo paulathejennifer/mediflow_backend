@@ -22,7 +22,7 @@ router = APIRouter()
 
 @router.post("", response_model=FacilityResponse)
 @router.post("/", response_model=FacilityResponse)
-def create_facility(
+async def create_facility(
     facility_data: FacilityCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

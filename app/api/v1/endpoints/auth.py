@@ -44,7 +44,7 @@ def register(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=user.id,
-            action=AuditAction.CREATE,
+            action=AuditAction.CREATE.value,
             entity_type="user",
             entity_id=user.id,
             details={"email": user.email, "role": user.role},
@@ -78,7 +78,7 @@ def login(
         if user:
             audit_logger.log_action(
                 user_id=user.id,
-                action=AuditAction.LOGIN,
+                action=AuditAction.LOGIN.value,
                 entity_type="user",
                 entity_id=user.id,
             )
