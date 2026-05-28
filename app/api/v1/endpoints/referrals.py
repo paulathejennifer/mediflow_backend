@@ -24,7 +24,7 @@ router = APIRouter()
 
 @router.post("", response_model=ReferralResponse)
 @router.post("/", response_model=ReferralResponse)
-def create_referral(
+async def create_referral(
     referral_data: ReferralCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -305,7 +305,7 @@ def update_referral(
 
 
 @router.post("/{referral_id}/submit")
-def submit_referral(
+async def submit_referral(
     referral_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

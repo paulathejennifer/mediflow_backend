@@ -186,7 +186,7 @@ def update_user(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPDATE,
+            action=AuditAction.UPDATE.value,
             entity_type="user",
             entity_id=user.id,
             details=update_data,
@@ -339,7 +339,7 @@ def activate_user(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPDATE,
+            action=AuditAction.UPDATE.value,
             entity_type="user",
             entity_id=user.id,
             details={"action": "activate", "email": user.email, "role": user.role},

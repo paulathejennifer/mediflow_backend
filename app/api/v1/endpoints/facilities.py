@@ -180,7 +180,7 @@ def update_facility(
 
 
 @router.delete("/{facility_id}")
-def deactivate_facility(
+async def deactivate_facility(
     facility_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -206,7 +206,7 @@ def deactivate_facility(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.DELETE,
+            action=AuditAction.DELETE.value,
             entity_type="facility",
             entity_id=facility.id,
             details={"action": "deactivate", "name": facility.name},
