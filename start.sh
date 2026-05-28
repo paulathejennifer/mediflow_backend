@@ -20,9 +20,34 @@ with engine.connect() as conn:
     sleep 2
 done
 
+# Manual Schema Sync (Fix for missing columns on Free Render Tier)
+echo "Ensuring database schema is synchronized..."
+python -c "
+from sqlalchemy import create_engine, text
+import os
+engine = create_engine(os.getenv('DATABASE_URL'))
+with engine.connect() as conn:
+    queries = [
+        'ALTER TABLE facilities ADD COLUMN IF NOT EXISTS performance_score FLOAT DEFAULT 0.0',
+        'ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS read_at TIMESTAMP WITH TIME ZONE',
+        'ALTER TABLE referrals ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP WITH TIME ZONE',
+        'ALTER TABLE referrals ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP WITH TIME ZONE',
+        'ALTER TABLE referrals ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP WITH TIME ZONE',
+        'ALTER TABLE referrals ADD COLUMN IF NOT EXISTS rejection_reason TEXT'
+    ]
+    for q in queries:
+        try:
+            conn.execute(text(q))
+            conn.commit()
+        except Exception as e:
+            print(f'Skipping sync query: {e}')
+    print('Manual schema sync complete.')
+"
+
 # Run database migrations
 echo "Running database migrations..."
 if alembic upgrade head; then
+
     echo "Migrations complete."
 else
     echo "WARNING: Alembic migrations failed. Attempting fallback schema creation."
@@ -48,3 +73,7 @@ else
     echo "Mode: Production (gunicorn + uvicorn workers)"
     exec gunicorn app.main:app -c gunicorn.conf.py
 fi
+
+
+
+

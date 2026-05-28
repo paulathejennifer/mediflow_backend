@@ -374,7 +374,7 @@ class FacilityService:
 
         # Referral status breakdown
         referral_status_stats = {}
-        for status in ReferralStatus:
+        for ref_status in ReferralStatus:
             status_count = (
                 self.db.query(Referral)
                 .filter(
@@ -383,12 +383,21 @@ class FacilityService:
                             Referral.from_facility_id == facility_id,
                             Referral.to_facility_id == facility_id,
                         ),
-                        Referral.status == status.value,
+                        Referral.status == ref_status.value,
                     )
                 )
                 .count()
             )
-            referral_status_stats[status.value] = status_count
+            referral_status_stats[ref_status.value] = status_count
+
+        # Calculate real-time performance score
+        total_referrals = referral_stats["total_referrals"]
+        completed = referral_status_stats.get(ReferralStatus.COMPLETED.value, 0)
+        performance = round((completed / max(total_referrals, 1)) * 100, 1)
+        
+        # Update the facility record with the new score
+        facility.performance_score = performance
+        self.db.commit()
 
         return {
             "facility_info": {
@@ -398,6 +407,7 @@ class FacilityService:
                 "type": facility.type,
                 "level": facility.level,
                 "county": facility.county,
+                "performance": performance
             },
             "user_stats": {
                 "total_users": total_users,
