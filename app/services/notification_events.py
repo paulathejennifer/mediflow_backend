@@ -296,7 +296,7 @@ class NotificationEventCreators:
                 "accepting_physician_name": physician_name,
                 "accepted_at": referral.accepted_at.isoformat() if referral.accepted_at else datetime.now(timezone.utc).isoformat(),
                 "eta": "2 hours",
-                "accepting_facility_contact": referral.to_facility.contact_phone if referral.to_facility else "",
+                "accepting_facility_contact": referral.to_facility.phone if referral.to_facility else "",
             },
             actions=["Prepare Patient", "Schedule Bed", "Alert Staff", "Update Family"],
             roles=["facility_admin", "clinician"],

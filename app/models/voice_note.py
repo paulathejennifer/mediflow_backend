@@ -8,8 +8,8 @@ class VoiceNote(Base):
     __tablename__ = "voice_notes"
 
     id = Column(Integer, primary_key=True, index=True)
-    referral_id = Column(Integer, ForeignKey("referrals.id"), nullable=False)
-    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    referral_id = Column(Integer, ForeignKey("referrals.id", name="fk_voicenote_referral"), nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.id", name="fk_voicenote_uploader"), nullable=False)
     audio_path = Column(String, nullable=False)
     audio_file_name = Column(String, nullable=False)
     audio_file_size = Column(Integer, nullable=False)

@@ -8,10 +8,10 @@ class Referral(Base):
     __tablename__ = "referrals"
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-    from_facility_id = Column(Integer, ForeignKey("facilities.id"), nullable=False)
-    to_facility_id = Column(Integer, ForeignKey("facilities.id"), nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id", name="fk_referral_patient"), nullable=False)
+    from_facility_id = Column(Integer, ForeignKey("facilities.id", name="fk_referral_from_facility"), nullable=False)
+    to_facility_id = Column(Integer, ForeignKey("facilities.id", name="fk_referral_to_facility"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id", name="fk_referral_creator"), nullable=False)
     priority = Column(String, nullable=False, default=Priority.MEDIUM)
     status = Column(String, nullable=False, default=ReferralStatus.DRAFT)
     reason_for_referral = Column(Text, nullable=True)
@@ -19,6 +19,10 @@ class Referral(Base):
     ai_summary = Column(Text, nullable=True)
     ai_status = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+    rejected_at = Column(DateTime(timezone=True), nullable=True)
+    rejection_reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

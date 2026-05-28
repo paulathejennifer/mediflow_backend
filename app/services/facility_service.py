@@ -280,7 +280,7 @@ class FacilityService:
         Returns:
             List of facilities
         """
-        query = self.db.query(Facility).filter(Facility.is_active == "true")
+        query = self.db.query(Facility).filter(Facility.is_active == True)
 
         if county:
             query = query.filter(Facility.county.ilike(f"%{county}%"))
@@ -496,7 +496,7 @@ class FacilityService:
             self.db.query(Facility)
             .filter(
                 and_(
-                    Facility.is_active == "true",
+                    Facility.is_active == True,
                     or_(
                         Facility.name.ilike(search_term),
                         Facility.facility_code.ilike(search_term),

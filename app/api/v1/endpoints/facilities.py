@@ -195,7 +195,7 @@ def deactivate_facility(
         )
 
     try:
-        facility.is_active = "false"
+        facility.is_active = False
         db.commit()
 
         # Log deactivation

@@ -21,7 +21,7 @@ class Patient(Base):
     allergies = Column(Text, nullable=True)
     medications = Column(Text, nullable=True)
     chronic_conditions = Column(Text, nullable=True)
-    facility_id = Column(Integer, ForeignKey("facilities.id"), nullable=False)
+    facility_id = Column(Integer, ForeignKey("facilities.id", name="fk_patient_facility"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

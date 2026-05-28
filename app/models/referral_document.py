@@ -8,8 +8,8 @@ class ReferralDocument(Base):
     __tablename__ = "referral_documents"
 
     id = Column(Integer, primary_key=True, index=True)
-    referral_id = Column(Integer, ForeignKey("referrals.id"), nullable=False)
-    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    referral_id = Column(Integer, ForeignKey("referrals.id", name="fk_document_referral"), nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.id", name="fk_document_uploader"), nullable=False)
     file_path = Column(String, nullable=False)
     file_name = Column(String, nullable=False)
     file_type = Column(String, nullable=False)

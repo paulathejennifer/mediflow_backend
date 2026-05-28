@@ -180,9 +180,9 @@ def get_dashboard_kpis(
             admin_trend = calculate_trend(new_admins_current, new_admins_prev)
 
             # Active Users Trend
-            active_users_count = db.query(User).filter(User.is_active == "true").count()
-            new_active_current = db.query(User).filter(and_(User.is_active == "true", User.created_at >= start_date)).count()
-            new_active_prev = db.query(User).filter(and_(User.is_active == "true", User.created_at >= prev_start_date, User.created_at < start_date)).count()
+            active_users_count = db.query(User).filter(User.is_active == True).count()
+            new_active_current = db.query(User).filter(and_(User.is_active == True, User.created_at >= start_date)).count()
+            new_active_prev = db.query(User).filter(and_(User.is_active == True, User.created_at >= prev_start_date, User.created_at < start_date)).count()
             active_trend = calculate_trend(new_active_current, new_active_prev)
 
             # Calculate Document Trend
@@ -319,9 +319,9 @@ def get_dashboard_kpis(
             admin_trend = calculate_trend(new_admins_current, new_admins_prev)
 
             # Active Users Trend for Facility
-            active_users_count = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == "true")).count()
-            new_active_current = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == "true", User.created_at >= start_date)).count()
-            new_active_prev = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == "true", User.created_at >= prev_start_date, User.created_at < start_date)).count()
+            active_users_count = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == True)).count()
+            new_active_current = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == True, User.created_at >= start_date)).count()
+            new_active_prev = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == True, User.created_at >= prev_start_date, User.created_at < start_date)).count()
             active_trend = calculate_trend(new_active_current, new_active_prev)
 
             # Referrals for this facility
@@ -1085,12 +1085,12 @@ def get_system_health(
         
         # Get facility metrics
         total_facilities = db.query(func.count(Facility.id)).scalar() or 0
-        active_facilities = db.query(func.count(Facility.id)).filter(Facility.is_active == "true").scalar() or 0
+        active_facilities = db.query(func.count(Facility.id)).filter(Facility.is_active == True).scalar() or 0
         facility_rate = (active_facilities / max(total_facilities, 1)) * 100
         
         # Get user metrics
         total_users = db.query(func.count(User.id)).scalar() or 0
-        active_users = db.query(func.count(User.id)).filter(User.is_active == "true").scalar() or 0
+        active_users = db.query(func.count(User.id)).filter(User.is_active == True).scalar() or 0
         user_rate = (active_users / max(total_users, 1)) * 100
         
         # Calculate overall health score
@@ -1196,7 +1196,7 @@ def get_analytics_metrics(
         total_documents = document_query.count()
         
         # Count active users
-        active_users = db.query(func.count(User.id)).filter(User.is_active == "true").scalar() or 0
+        active_users = db.query(func.count(User.id)).filter(User.is_active == True).scalar() or 0
         
         # Calculate growth rate using aggregation
         now = datetime.utcnow()
