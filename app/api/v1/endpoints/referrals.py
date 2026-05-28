@@ -98,7 +98,7 @@ async def create_referral(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.CREATE,
+            action=AuditAction.CREATE.value,
             entity_type="referral",
             entity_id=referral.id,
             details={

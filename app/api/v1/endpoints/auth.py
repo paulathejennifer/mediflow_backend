@@ -120,7 +120,7 @@ def change_password(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPDATE,
+            action=AuditAction.UPDATE.value,
             entity_type="user",
             entity_id=current_user.id,
             details={"action": "password_change"},
@@ -145,7 +145,7 @@ def logout(
     audit_logger = create_audit_logger(db)
     audit_logger.log_action(
         user_id=current_user.id,
-        action=AuditAction.LOGOUT,
+        action=AuditAction.LOGOUT.value,
         entity_type="user",
         entity_id=current_user.id,
     )
@@ -233,7 +233,7 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
     audit_logger = create_audit_logger(db)
     audit_logger.log_action(
         user_id=user.id,
-        action=AuditAction.UPDATE,
+        action=AuditAction.UPDATE.value,
         entity_type="user",
         entity_id=user.id,
         details={"action": "password_reset"},
@@ -282,7 +282,7 @@ async def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db
     audit_logger = create_audit_logger(db)
     audit_logger.log_action(
         user_id=user.id,
-        action=AuditAction.UPDATE,
+        action=AuditAction.UPDATE.value,
         entity_type="user",
         entity_id=user.id,
         details={"action": "email_verified"},
