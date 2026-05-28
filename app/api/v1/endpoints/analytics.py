@@ -11,6 +11,7 @@ from app.models.facility import Facility
 from app.models.patient_identifier import PatientIdentifier # Import PatientIdentifier
 from app.models.patient import Patient
 from app.models.referral_document import ReferralDocument
+from app.models.notifications import Notification
 from app.enums import UserRole, ReferralStatus, Priority
 from sqlalchemy import and_, or_, func, extract, case
 from sqlalchemy.sql import label
@@ -240,6 +241,45 @@ def get_dashboard_kpis(
             avg_referrals_per_facility = (
                 total_referrals / max(total_facilities, 1)
             )
+
+            # --- NEW: SUPER ADMIN INSIGHTS ---
+            # 1. Recent Alerts (Last 5 critical/warning notifications)
+            recent_alerts = db.query(Notification).filter(
+                and_(
+                    Notification.user_id.is_(None),
+                    Notification.roles.contains(['super_admin']),
+                    Notification.notification_type.in_(['critical', 'warning'])
+                )
+            ).order_by(Notification.created_at.desc()).limit(5).all()
+
+            # 2. Quick Insights (Top Contributor)
+            top_facility = db.query(
+                Facility.name, 
+                func.count(Referral.id).label('count')
+            ).join(Referral, Facility.id == Referral.from_facility_id)\
+             .group_by(Facility.id)\
+             .order_by(func.count(Referral.id).desc()).first()
+
+            quick_insights = []
+            if top_facility:
+                quick_insights.append({
+                    "label": "Top Contributor",
+                    "value": f"{top_facility[0]} ({top_facility[1]} referrals)"
+                })
+            
+            # 3. SLA Compliance (Referrals accepted within 4 hours)
+            sla_compliant = db.query(Referral).filter(
+                and_(
+                    Referral.status == ReferralStatus.ACCEPTED.value,
+                    Referral.accepted_at.isnot(None),
+                    Referral.submitted_at.isnot(None),
+                    extract('epoch', Referral.accepted_at - Referral.submitted_at) / 3600 <= 4
+                )
+            ).count()
+            total_processed = db.query(Referral).filter(Referral.status.in_([ReferralStatus.ACCEPTED.value, ReferralStatus.REJECTED.value])).count()
+            sla_rate = round((sla_compliant / max(total_processed, 1)) * 100, 1)
+            quick_insights.append({"label": "SLA Compliance", "value": f"{sla_rate}% timely response"})
+            # --------------------------------
             
             return {
                 "total_patients": total_patients,
@@ -267,6 +307,15 @@ def get_dashboard_kpis(
                     round((total_referrals / max(total_facilities * 100, 1)) * 100, 1),
                     100
                 ),
+                "recent_alerts": [
+                    {
+                        "id": str(n.id),
+                        "severity": n.notification_type,
+                        "message": n.title,
+                        "timestamp": n.created_at.isoformat()
+                    } for n in recent_alerts
+                ],
+                "quick_insights": quick_insights
             }
         
         elif current_user.facility_id:

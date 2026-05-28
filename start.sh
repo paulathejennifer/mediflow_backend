@@ -21,6 +21,7 @@ with engine.connect() as conn:
 done
 
 
+
 # Manual Schema Sync (Fix for missing columns on Free Render Tier)
 echo "Ensuring database schema is synchronized..."
 python <<'EOF_PYTHON_SCRIPT'
@@ -55,6 +56,8 @@ EOF_PYTHON_SCRIPT
 
 # Run database migrations
 echo "Running database migrations..."
+
+
 if alembic upgrade head; then
 
     echo "Migrations complete."
