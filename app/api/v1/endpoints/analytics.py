@@ -244,6 +244,7 @@ def get_dashboard_kpis(
 
             # --- NEW: SUPER ADMIN INSIGHTS ---
             # 1. Recent Alerts (Last 5 critical/warning notifications)
+            # Fix: Explicitly cast JSONB roles to Text to avoid "jsonb ~~ text" operator error in PostgreSQL
             recent_alerts = db.query(Notification).filter(
                 and_(
                     Notification.user_id.is_(None),
