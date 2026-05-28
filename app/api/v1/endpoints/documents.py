@@ -68,7 +68,7 @@ async def upload_document(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPLOAD,
+            action=AuditAction.UPLOAD.value,
             entity_type="document",
             entity_id=document.id,
             details={

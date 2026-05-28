@@ -280,8 +280,16 @@ class NotificationBroadcaster:
     def __init__(self, connection_manager: ConnectionManager):
         self.connection_manager = connection_manager
 
-    async def broadcast_notification(self, notification: Notification, db: Session):
+    async def broadcast_notification(self, notification_id: int):
         """Broadcast notification to appropriate users based on roles and facility"""
+        from app.core.database import SessionLocal
+        db = SessionLocal()
+        try:
+            notification = db.query(Notification).filter(Notification.id == notification_id).first()
+            if not notification:
+                logger.error(f"Notification {notification_id} not found for broadcast")
+                return
+
         notification_data = {
             "id": notification.id,
             "type": notification.notification_type,
@@ -328,8 +336,12 @@ class NotificationBroadcaster:
         logger.info(
             f"Notification {notification.id} broadcast: {total_sent} sent, {total_failed} failed"
         )
-
+        
         return total_sent, total_failed
+        except Exception as e:
+            logger.error(f"Broadcast failed: {e}")
+        finally:
+            db.close()
 
     async def record_delivery_attempts(
         self,

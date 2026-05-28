@@ -58,7 +58,7 @@ async def upload_voice_note(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPLOAD,
+            action=AuditAction.UPLOAD.value,
             entity_type="voice_note",
             entity_id=voice_note.id,
             details={

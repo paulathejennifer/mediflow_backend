@@ -521,11 +521,8 @@ class VoiceService:
                 "specialty": "General",  # Would get from referral context
             }
 
-            # Clean transcript (async in production)
-            ai_service = AIService(self.db)
-            import asyncio
-
-            cleanup_result = asyncio.run(ai_service.clean_transcription(context))
+            # Fix: Run cleanup in a task to avoid "run() cannot be called from a running loop"
+            asyncio.create_task(self._run_async_cleanup(voice_note_id, context))
 
             # Update voice note with cleaned transcript
             voice_note.processed_transcript = cleanup_result.get(

@@ -100,7 +100,6 @@ class AuditService:
         Returns:
             Created audit log entry
         """
-        import json
 
         audit_log = AuditLog(
             user_id=user_id,
