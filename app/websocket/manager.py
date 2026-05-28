@@ -290,54 +290,54 @@ class NotificationBroadcaster:
                 logger.error(f"Notification {notification_id} not found for broadcast")
                 return
 
-        notification_data = {
-            "id": notification.id,
-            "type": notification.notification_type,
-            "title": notification.title,
-            "message": notification.message,
-            "details": notification.details,
-            "actions": notification.actions,
-            "roles": notification.roles,
-            "backend_source": notification.backend_source,
-            "timestamp": notification.created_at.isoformat(),
-            "expires_at": notification.expires_at.isoformat()
-            if notification.expires_at
-            else None,
-        }
+            notification_data = {
+                "id": notification.id,
+                "type": notification.notification_type,
+                "title": notification.title,
+                "message": notification.message,
+                "details": notification.details,
+                "actions": notification.actions,
+                "roles": notification.roles,
+                "backend_source": notification.backend_source,
+                "timestamp": notification.created_at.isoformat(),
+                "expires_at": notification.expires_at.isoformat()
+                if notification.expires_at
+                else None,
+            }
 
-        # Determine target users based on roles
-        target_roles = notification.roles
+            # Determine target users based on roles
+            target_roles = notification.roles
 
-        # Handle shared notifications (roles include both "facility_admin" and "clinician")
-        if "shared" in target_roles:
-            target_roles = ["facility_admin", "clinician"]
+            # Handle shared notifications (roles include both "facility_admin" and "clinician")
+            if "shared" in target_roles:
+                target_roles = ["facility_admin", "clinician"]
 
-        # Broadcast to target roles
-        total_sent, total_failed = await self.connection_manager.broadcast_to_roles(
-            target_roles, notification_data
-        )
-
-        # If notification is facility-specific, also broadcast to facility users
-        if hasattr(notification, "facility_id") and notification.facility_id:
-            (
-                facility_sent,
-                facility_failed,
-            ) = await self.connection_manager.broadcast_to_facility(
-                notification.facility_id, notification_data
+            # Broadcast to target roles
+            total_sent, total_failed = await self.connection_manager.broadcast_to_roles(
+                target_roles, notification_data
             )
-            total_sent += facility_sent
-            total_failed += facility_failed
 
-        # Record delivery attempts
-        await self.record_delivery_attempts(
-            notification, target_roles, total_sent, total_failed, db
-        )
+            # If notification is facility-specific, also broadcast to facility users
+            if hasattr(notification, "facility_id") and notification.facility_id:
+                (
+                    facility_sent,
+                    facility_failed,
+                ) = await self.connection_manager.broadcast_to_facility(
+                    notification.facility_id, notification_data
+                )
+                total_sent += facility_sent
+                total_failed += facility_failed
 
-        logger.info(
-            f"Notification {notification.id} broadcast: {total_sent} sent, {total_failed} failed"
-        )
-        
-        return total_sent, total_failed
+            # Record delivery attempts
+            await self.record_delivery_attempts(
+                notification, target_roles, total_sent, total_failed, db
+            )
+
+            logger.info(
+                f"Notification {notification.id} broadcast: {total_sent} sent, {total_failed} failed"
+            )
+            
+            return total_sent, total_failed
         except Exception as e:
             logger.error(f"Broadcast failed: {e}")
         finally:

@@ -521,18 +521,30 @@ class VoiceService:
                 "specialty": "General",  # Would get from referral context
             }
 
-            # Fix: Run cleanup in a task to avoid "run() cannot be called from a running loop"
+                # Fix: Run cleanup in a task to avoid "run() cannot be called from a running loop"
             asyncio.create_task(self._run_async_cleanup(voice_note_id, context))
-
-            # Update voice note with cleaned transcript
-            voice_note.processed_transcript = cleanup_result.get(
-                "cleaned_transcript", ""
-            )
-            voice_note.ai_summary = cleanup_result.get("notes", "")
-            self.db.commit()
 
         except Exception as e:
             print(f"Transcript cleanup failed for voice note {voice_note_id}: {str(e)}")
+
+    async def _run_async_cleanup(self, voice_note_id: int, context: Dict[str, Any]) -> None:
+        """Background task for transcript cleanup with its own session."""
+        from app.core.database import SessionLocal
+        db = SessionLocal()
+        try:
+            ai_service = AIService(db)
+            cleanup_result = await ai_service.clean_transcription(context)
+            
+            voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).first()
+            if voice_note:
+                voice_note.processed_transcript = cleanup_result.get("cleaned_transcript", "")
+                voice_note.ai_summary = cleanup_result.get("notes", "")
+                voice_note.status = VoiceStatus.TRANSCRIBED.value
+                db.commit()
+        except Exception as e:
+            print(f"Background cleanup failed: {e}")
+        finally:
+            db.close()
 
     def _get_matched_content(
         self, text: str, query: str, context_length: int = 100

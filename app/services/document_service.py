@@ -461,16 +461,11 @@ class DocumentService:
                 "referral_reason": referral.reason_for_referral,
                 "patient_name": "Patient",  # Would get from referral
                 "age": "Unknown",  # Would get from referral
-                "gender": "Unknown",  # Would get from referral
+                 "gender": "Unknown",  # Would get from referral
             }
 
-            # Extract medical information (async in production)
-            import asyncio
-
-            extraction_result = asyncio.run(ai_service.extract_document_info(context))
-
-            # Update document with AI analysis results
-            # This could be stored in a separate table or as JSON in the document
+            # Fix: Ensure logic is inside try block and asyncio is used correctly
+            asyncio.create_task(self._run_async_analysis(document_id, context))
 
         except Exception as e:
             print(f"Medical analysis failed for document {document_id}: {str(e)}")

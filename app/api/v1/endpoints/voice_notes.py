@@ -227,7 +227,7 @@ def update_voice_note(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPDATE,
+            action=AuditAction.UPDATE.value,
             entity_type="voice_note",
             entity_id=voice_note.id,
             details=update_data,
@@ -279,7 +279,7 @@ async def transcribe_voice_note(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPDATE,
+            action=AuditAction.UPDATE.value,
             entity_type="voice_note",
             entity_id=voice_note.id,
             details={
@@ -419,7 +419,7 @@ def delete_voice_note(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.DELETE,
+            action=AuditAction.DELETE.value,
             entity_type="voice_note",
             entity_id=voice_note.id,
             details={

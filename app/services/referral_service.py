@@ -640,15 +640,21 @@ class ReferralService:
         except Exception as e:
             print(f"AI trigger failed: {e}")
 
+
     async def _run_ai_summarization(self, referral_id: int, context: Dict[str, Any]) -> None:
+        """Internal method to execute AI summarization with its own session."""
+        from app.core.database import SessionLocal
+        db = SessionLocal()
         try:
-            ai_service = AIService(self.db)
+            ai_service = AIService(db)
             summary_result = await ai_service.generate_referral_summary(context)
             # Update referral with AI summary
-            referral = self.get_referral_by_id(referral_id)
-            referral.ai_summary = summary_result.get("summary", "")
-            referral.ai_status = "completed"
-            self.db.commit()
+            referral = db.query(Referral).filter(Referral.id == referral_id).first()
+            if referral:
+                referral.ai_summary = summary_result.get("summary", "")
+                referral.ai_status = "completed"
+                db.commit()
+
 
         except Exception as e:
             # Log error but don't fail the referral creation

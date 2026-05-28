@@ -246,7 +246,7 @@ async def transcribe_document(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPDATE,
+            action=AuditAction.UPDATE.value,
             entity_type="document",
             entity_id=document.id,
             details={
@@ -384,7 +384,7 @@ def delete_document(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.DELETE,
+            action=AuditAction.DELETE.value,
             entity_type="document",
             entity_id=document.id,
             details={
