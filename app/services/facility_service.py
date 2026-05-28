@@ -307,7 +307,7 @@ class FacilityService:
             List of users in the facility
         """
         query = self.db.query(User).filter(
-            and_(User.facility_id == facility_id, User.is_active == "true")
+            and_(User.facility_id == facility_id, User.is_active == True)
         )
 
         if role:
@@ -337,14 +337,14 @@ class FacilityService:
         )
         active_users = (
             self.db.query(User)
-            .filter(and_(User.facility_id == facility_id, User.is_active == "true"))
+            .filter(and_(User.facility_id == facility_id, User.is_active == True))
             .count()
         )
 
         # User role breakdown
         role_counts = (
             self.db.query(User.role, func.count(User.id))
-            .filter(User.facility_id == facility_id, User.is_active == "true")
+            .filter(User.facility_id == facility_id, User.is_active == True)
             .group_by(User.role)
             .all()
         )
