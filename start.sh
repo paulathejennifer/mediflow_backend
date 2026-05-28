@@ -20,9 +20,10 @@ with engine.connect() as conn:
     sleep 2
 done
 
+
 # Manual Schema Sync (Fix for missing columns on Free Render Tier)
 echo "Ensuring database schema is synchronized..."
-python -c "
+python <<'EOF_PYTHON_SCRIPT'
 from sqlalchemy import create_engine, text
 import os
 engine = create_engine(os.getenv('DATABASE_URL'))
@@ -50,7 +51,7 @@ with engine.connect() as conn:
         except Exception as e:
             print(f'Skipping sync query: {e}')
     print('Manual schema sync complete.')
-"
+EOF_PYTHON_SCRIPT
 
 # Run database migrations
 echo "Running database migrations..."
