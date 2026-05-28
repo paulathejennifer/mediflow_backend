@@ -486,7 +486,6 @@ def get_referrals_by_status(
         status_counts = {}
         for ref_status in display_statuses:
             count = query.filter(Referral.status == ref_status.value).count()
-            
             if count > 0:
                 display_name = status_display_map.get(ref_status.value, ref_status.value)
                 status_counts[display_name] = count

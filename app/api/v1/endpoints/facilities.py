@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_same_facility
+from app.core.dependencies import get_current_user
 from app.utils.permissions import get_permission_checker
 from app.utils.audit_utils import create_audit_logger
 from app.schemas.facility import (
@@ -44,7 +44,7 @@ def create_facility(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.CREATE,
+            action=AuditAction.CREATE.value,
             entity_type="facility",
             entity_id=facility.id,
             details={"name": facility.name, "code": facility.facility_code},
@@ -164,7 +164,7 @@ def update_facility(
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
-            action=AuditAction.UPDATE,
+            action=AuditAction.UPDATE.value,
             entity_type="facility",
             entity_id=facility.id,
             details=update_data,
