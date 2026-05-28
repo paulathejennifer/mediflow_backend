@@ -76,9 +76,9 @@ def get_referral_analytics(
     
     # Status breakdown
     status_breakdown = {}
-    for status in ReferralStatus:
-        count = base_query.filter(Referral.status == status.value).count()
-        status_breakdown[status.value] = count
+    for ref_status in ReferralStatus:
+        count = base_query.filter(Referral.status == ref_status.value).count()
+        status_breakdown[ref_status.value] = count
     
     # Priority breakdown
     priority_breakdown = {}
@@ -483,10 +483,10 @@ def get_referrals_by_status(
         }
         
         status_counts = {}
-        for status in display_statuses:
-            count = query.filter(Referral.status == status.value).count()
+        for ref_status in display_statuses:
+            count = query.filter(Referral.status == ref_status.value).count()
             if count > 0:
-                display_name = status_display_map.get(status.value, status.value)
+                display_name = status_display_map.get(ref_status.value, ref_status.value)
                 status_counts[display_name] = count
         
         return {
