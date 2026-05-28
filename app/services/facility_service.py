@@ -391,7 +391,7 @@ class FacilityService:
             referral_status_stats[ref_status.value] = status_count
 
         # Calculate real-time performance score
-        total_referrals = referral_stats["total_referrals"]
+        total_referrals = sent_referrals + received_referrals
         completed = referral_status_stats.get(ReferralStatus.COMPLETED.value, 0)
         performance = round((completed / max(total_referrals, 1)) * 100, 1)
         

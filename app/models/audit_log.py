@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -12,7 +12,7 @@ class AuditLog(Base):
     action = Column(String, nullable=False)
     entity_type = Column(String, nullable=False)
     entity_id = Column(Integer, nullable=True)
-    details = Column(Text, nullable=True)
+    details = Column(JSON, nullable=True)
     ip_address = Column(String, nullable=True)
     user_agent = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

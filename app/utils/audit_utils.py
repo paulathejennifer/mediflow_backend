@@ -26,7 +26,7 @@ class AuditService:
             action=action,
             entity_type=entity_type,
             entity_id=entity_id,
-            details=json.dumps(details) if details else None,
+            details=details,
             ip_address=ip_address,
             user_agent=user_agent,
         )
