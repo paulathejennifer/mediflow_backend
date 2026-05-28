@@ -241,6 +241,10 @@ def get_dashboard_kpis(
             avg_referrals_per_facility = (
                 total_referrals / max(total_facilities, 1)
             )
+            
+            # Average Referrals per Staff (Admins + Clinicians)
+            total_staff = clinician_count + admin_count
+            avg_referrals_per_staff = round(total_referrals / max(total_staff, 1), 1)
 
             # --- NEW: SUPER ADMIN INSIGHTS ---
             # 1. Recent Alerts (Last 5 critical/warning notifications)
@@ -304,6 +308,7 @@ def get_dashboard_kpis(
                 "pending_referrals": pending_referrals,
                 "rejection_rate": round(rejection_rate, 2),
                 "avg_referrals_per_facility": round(avg_referrals_per_facility, 1),
+                "avg_referrals_per_staff": avg_referrals_per_staff,
                 "system_utilization_percent": min(
                     round((total_referrals / max(total_facilities * 100, 1)) * 100, 1),
                     100
@@ -313,7 +318,7 @@ def get_dashboard_kpis(
                         "id": str(n.id),
                         "severity": n.notification_type,
                         "message": n.title,
-                        "timestamp": n.created_at.isoformat()
+                        "createdAt": n.created_at.isoformat()
                     } for n in recent_alerts
                 ],
                 "quick_insights": quick_insights
@@ -368,6 +373,10 @@ def get_dashboard_kpis(
             new_admins_current = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.FACILITY_ADMIN.value, User.created_at >= start_date)).count()
             new_admins_prev = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.FACILITY_ADMIN.value, User.created_at >= prev_start_date, User.created_at < start_date)).count()
             admin_trend = calculate_trend(new_admins_current, new_admins_prev)
+
+            # Average Referrals per Staff for Facility
+            total_staff = clinician_count + admin_count
+            avg_referrals_per_staff = round(total_referrals / max(total_staff, 1), 1)
 
             # Active Users Trend for Facility
             active_users_count = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == True)).count()
@@ -472,6 +481,7 @@ def get_dashboard_kpis(
                 "total_documents_trend": doc_trend,
                 "active_referrals": active_referrals,
                 "pending_referrals": pending_referrals,
+                "avg_referrals_per_staff": avg_referrals_per_staff,
                 "facility_utilization_percent": min(
                     round((total_referrals / 100) * 100, 1),
                     100
@@ -536,9 +546,9 @@ def get_referrals_by_status(
         status_counts = {}
         for r_status in display_statuses:
             count = query.filter(Referral.status == r_status.value).count()
-            if count > 0:
-                display_name = status_display_map.get(r_status.value, r_status.value)
-                status_counts[display_name] = count
+            # Return all statuses, even 0, to prevent frontend mock fallbacks
+            display_name = status_display_map.get(r_status.value, r_status.value)
+            status_counts[display_name] = count
         
         return {
             "labels": list(status_counts.keys()),

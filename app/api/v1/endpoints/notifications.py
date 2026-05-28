@@ -23,7 +23,7 @@ router = APIRouter()
 @router.get("/", response_model=List[Dict[str, Any]])
 async def list_notifications(
     notification_type: Optional[str] = None,
-    unread_only: bool = False,
+    is_read: Optional[bool] = Query(None, alias="unread_only"),
     limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -37,7 +37,7 @@ async def list_notifications(
         user_id=current_user.id,
         user_role=current_user.role,
         notification_type=notification_type,
-        unread_only=unread_only,
+        unread_only=not is_read if is_read is not None else False,
         limit=limit
     )
     
@@ -51,7 +51,7 @@ async def list_notifications(
             "details": n.details,
             "actions": n.actions,
             "backend_source": n.backend_source,
-            "created_at": n.created_at.isoformat(),
+            "createdAt": n.created_at.isoformat(),
             "is_read": getattr(n, 'user_specific_read', n.is_read),
         } for n in notifications
     ]

@@ -90,6 +90,7 @@ class UserService:
             email=email,
             password_hash=get_password_hash(user_data.password),
             role=user_data.role,
+            phone=user_data.phone,
             facility_id=user_data.facility_id,
         )
 
