@@ -104,6 +104,10 @@ def list_facilities(
             type=f.type,
             level=f.level,
             county=f.county,
+            address=f.address,
+            phone=f.phone,
+            email=f.email,
+            performance_score=f.performance_score,
             created_at=f.created_at,
             updated_at=f.updated_at,
         )

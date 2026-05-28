@@ -47,7 +47,12 @@ class FacilitySummary(BaseModel):
     type: str
     level: str
     county: str
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
     performance_score: float = 0.0
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
