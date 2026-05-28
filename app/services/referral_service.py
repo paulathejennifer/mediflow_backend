@@ -128,7 +128,8 @@ class ReferralService:
         # Validate status transitions
         if "status" in update_data:
             self._validate_status_transition(
-                referral.status, update_data["status"], updater_id
+                referral.status, update_data["status"], updater_id,
+                referral=referral
             )
 
         # Apply updates
@@ -517,7 +518,7 @@ class ReferralService:
         }
 
     def _validate_status_transition(
-        self, current_status: str, new_status: str, user_id: int
+        self, current_status: str, new_status: str, user_id: int, referral: Referral = None
     ) -> None:
         """Validate that status transition is allowed."""
         user = self.db.query(User).filter(User.id == user_id).first()
@@ -552,7 +553,7 @@ class ReferralService:
         # Additional role-based validations
         if (
             new_status == ReferralStatus.ACCEPTED
-            and user.facility_id != self.get_referral_by_id(user_id).to_facility_id
+            and referral and user.facility_id != referral.to_facility_id
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

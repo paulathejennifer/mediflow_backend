@@ -13,7 +13,7 @@ from app.models.patient import Patient
 from app.models.referral_document import ReferralDocument
 from app.models.notifications import Notification
 from app.enums import UserRole, ReferralStatus, Priority
-from sqlalchemy import and_, or_, func, extract, case
+from sqlalchemy import and_, or_, func, extract, case, cast, Text
 from sqlalchemy.sql import label
 from app.services.analytics_service import get_analytics_service
 
@@ -247,7 +247,7 @@ def get_dashboard_kpis(
             recent_alerts = db.query(Notification).filter(
                 and_(
                     Notification.user_id.is_(None),
-                    Notification.roles.contains(['super_admin']),
+                    cast(Notification.roles, Text).contains('super_admin'),
                     Notification.notification_type.in_(['critical', 'warning'])
                 )
             ).order_by(Notification.created_at.desc()).limit(5).all()
