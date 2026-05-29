@@ -42,7 +42,13 @@ with engine.connect() as conn:
         "ALTER TABLE audit_logs ALTER COLUMN details TYPE JSONB USING (details::jsonb)",
         "ALTER TABLE notifications ALTER COLUMN details TYPE JSONB USING (details::jsonb)",
         "ALTER TABLE notifications ALTER COLUMN actions TYPE JSONB USING (actions::jsonb)",
-        "ALTER TABLE notifications ALTER COLUMN roles TYPE JSONB USING (roles::jsonb)"
+        "ALTER TABLE notifications ALTER COLUMN roles TYPE JSONB USING (roles::jsonb)",
+        "ALTER TABLE patient_identifiers ADD COLUMN IF NOT EXISTS identifier_type VARCHAR(50)",
+        "ALTER TABLE patient_identifiers ADD COLUMN IF NOT EXISTS identifier_value VARCHAR(100)",
+        "UPDATE patient_identifiers SET identifier_type = 'MRN', identifier_value = mrn WHERE identifier_type IS NULL",
+        "ALTER TABLE patient_identifiers ALTER COLUMN identifier_type SET NOT NULL",
+        "ALTER TABLE patient_identifiers ALTER COLUMN identifier_value SET NOT NULL",
+
     ]
     for q in queries:
         try:
