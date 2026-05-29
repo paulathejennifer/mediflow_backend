@@ -248,14 +248,19 @@ def get_dashboard_kpis(
 
             # --- NEW: SUPER ADMIN INSIGHTS ---
             # 1. Recent Alerts (Last 5 critical/warning notifications)
-            # Fix: Use JSONB containment operator (@>) instead of Text casting to avoid "jsonb ~~ text" error
-            recent_alerts = db.query(Notification).filter(
-                and_(
-                    Notification.user_id.is_(None),
-                    Notification.roles.op('@>')(['super_admin']),
-                    Notification.notification_type.in_(['critical', 'warning'])
-                )
-            ).order_by(Notification.created_at.desc()).limit(5).all()
+            recent_alerts = []
+            try:
+                # Wrapped in try-block in case Notification table isn't migrated or roles isn't JSONB
+                recent_alerts = db.query(Notification).filter(
+                    and_(
+                        Notification.user_id.is_(None),
+                        Notification.notification_type.in_(['critical', 'warning'])
+                    )
+                ).order_by(Notification.created_at.desc()).limit(5).all()
+                # Filter roles in python for better cross-DB compatibility
+                recent_alerts = [n for n in recent_alerts if 'super_admin' in (n.roles or [])]
+            except Exception:
+                logger.warning("Notification table not available for analytics")
 
             # 2. Quick Insights (Top Contributor)
             top_facility = db.query(
@@ -273,17 +278,21 @@ def get_dashboard_kpis(
                 })
             
             # 3. SLA Compliance (Referrals accepted within 4 hours)
-            sla_compliant = db.query(Referral).filter(
-                and_(
-                    Referral.status == ReferralStatus.ACCEPTED.value,
-                    Referral.accepted_at.isnot(None),
-                    Referral.submitted_at.isnot(None),
-                    extract('epoch', Referral.accepted_at - Referral.submitted_at) / 3600 <= 4
-                )
-            ).count()
-            total_processed = db.query(Referral).filter(Referral.status.in_([ReferralStatus.ACCEPTED.value, ReferralStatus.REJECTED.value])).count()
-            sla_rate = round((sla_compliant / max(total_processed, 1)) * 100, 1)
-            quick_insights.append({"label": "SLA Compliance", "value": f"{sla_rate}% timely response"})
+            try:
+                sla_compliant = db.query(Referral).filter(
+                    and_(
+                        Referral.status == ReferralStatus.ACCEPTED.value,
+                        Referral.accepted_at.isnot(None),
+                        Referral.submitted_at.isnot(None),
+                        extract('epoch', Referral.accepted_at - Referral.submitted_at) / 3600 <= 4
+                    )
+                ).count()
+                total_processed = db.query(Referral).filter(Referral.status.in_([ReferralStatus.ACCEPTED.value, ReferralStatus.REJECTED.value])).count()
+                sla_rate = round((sla_compliant / max(total_processed, 1)) * 100, 1)
+                quick_insights.append({"label": "SLA Compliance", "value": f"{sla_rate}% timely response"})
+            except Exception:
+                # Fallback if accepted_at/submitted_at columns are missing from DB
+                quick_insights.append({"label": "SLA Compliance", "value": "N/A"})
             # --------------------------------
             
             return {
@@ -373,12 +382,6 @@ def get_dashboard_kpis(
             new_admins_current = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.FACILITY_ADMIN.value, User.created_at >= start_date)).count()
             new_admins_prev = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.FACILITY_ADMIN.value, User.created_at >= prev_start_date, User.created_at < start_date)).count()
             admin_trend = calculate_trend(new_admins_current, new_admins_prev)
-
-            # Average Referrals per Staff for Facility
-            total_staff = clinician_count + admin_count
-            avg_referrals_per_staff = round(total_referrals / max(total_staff, 1), 1)
-
-            # Active Users Trend for Facility
             active_users_count = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == True)).count()
             new_active_current = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == True, User.created_at >= start_date)).count()
             new_active_prev = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == True, User.created_at >= prev_start_date, User.created_at < start_date)).count()
@@ -397,6 +400,10 @@ def get_dashboard_kpis(
             
             total_referrals = facility_referrals.count()
             
+            # Average Referrals per Staff for Facility (Now moved after total_referrals is defined)
+            total_staff = clinician_count + admin_count
+            avg_referrals_per_staff = round(total_referrals / max(total_staff, 1), 1)
+
             # Facility Referral Trend
             total_referrals_prev = db.query(Referral).filter(
                 and_(
