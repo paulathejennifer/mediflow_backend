@@ -302,3 +302,63 @@ def get_patient_by_mrn(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get patient: {str(e)}",
         )
+
+
+@router.delete("/{patient_id}/hard")
+def hard_delete_patient(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete a patient and all associated records (Super Admin only)."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can permanently delete patients",
+        )
+
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found"
+        )
+
+    try:
+        # 1. Clean up identifiers
+        db.query(PatientIdentifier).filter(PatientIdentifier.patient_id == patient_id).delete(synchronize_session=False)
+
+        # 2. Clean up Referrals and their dependencies
+        from app.models.referral import Referral
+        from app.models.referral_document import ReferralDocument
+        from app.models.voice_note import VoiceNote
+
+        referral_ids = [
+            r.id for r in db.query(Referral.id).filter(Referral.patient_id == patient_id).all()
+        ]
+
+        if referral_ids:
+            db.query(ReferralDocument).filter(ReferralDocument.referral_id.in_(referral_ids)).delete(synchronize_session=False)
+            db.query(VoiceNote).filter(VoiceNote.referral_id.in_(referral_ids)).delete(synchronize_session=False)
+            db.query(Referral).filter(Referral.id.in_(referral_ids)).delete(synchronize_session=False)
+
+        # 3. Delete the patient record
+        db.delete(patient)
+        db.commit()
+
+        # Log deletion
+        audit_logger = create_audit_logger(db)
+        audit_logger.log_action(
+            user_id=current_user.id,
+            action=AuditAction.DELETE.value,
+            entity_type="patient",
+            entity_id=patient_id,
+            details={"name": f"{patient.first_name} {patient.last_name}"},
+        )
+
+        return {"message": "Patient and all associated records permanently deleted"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete patient: {str(e)}",
+        )

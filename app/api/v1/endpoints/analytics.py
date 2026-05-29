@@ -382,6 +382,8 @@ def get_dashboard_kpis(
             new_admins_current = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.FACILITY_ADMIN.value, User.created_at >= start_date)).count()
             new_admins_prev = db.query(User).filter(and_(User.facility_id == facility_id, User.role == UserRole.FACILITY_ADMIN.value, User.created_at >= prev_start_date, User.created_at < start_date)).count()
             admin_trend = calculate_trend(new_admins_current, new_admins_prev)
+
+            # Active Users Trend for Facility
             active_users_count = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == True)).count()
             new_active_current = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == True, User.created_at >= start_date)).count()
             new_active_prev = db.query(User).filter(and_(User.facility_id == facility_id, User.is_active == True, User.created_at >= prev_start_date, User.created_at < start_date)).count()
