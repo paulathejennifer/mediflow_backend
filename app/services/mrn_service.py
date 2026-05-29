@@ -150,6 +150,8 @@ class MRNService:
             # Create patient identifier
             identifier = PatientIdentifier(
                 patient_id=patient.id,
+                identifier_type="MRN",
+                identifier_value=mrn,
                 facility_id=facility_id,
                 is_primary=True,
                 mrn=mrn,
