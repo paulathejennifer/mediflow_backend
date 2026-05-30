@@ -31,7 +31,6 @@ EOF_PYTHON_SCRIPT
 # Run database migrations
 echo "Running database migrations..."
 
-
 if alembic upgrade head; then
 
     echo "Migrations complete."

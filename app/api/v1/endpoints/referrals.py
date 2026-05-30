@@ -179,6 +179,7 @@ def list_referrals(
             status=referral.status,
             priority=referral.priority,
             created_at=referral.created_at,
+            reason_for_referral=referral.reason_for_referral,
         )
         result.append(summary)
 
