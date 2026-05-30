@@ -18,7 +18,7 @@ from app.models.user import User
 from app.schemas.referral import ReferralCreate, ReferralUpdate
 from app.services.ai_service import AIService
 from app.enums import ReferralStatus, Priority, UserRole
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 import asyncio
 
@@ -217,6 +217,7 @@ class ReferralService:
             )
 
         referral.status = ReferralStatus.ACCEPTED
+        referral.submitted_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(referral)
 
