@@ -38,7 +38,8 @@ async def list_notifications(
         user_role=current_user.role,
         notification_type=notification_type,
         unread_only=not is_read if is_read is not None else False,
-        limit=limit
+        limit=limit,
+        facility_id=current_user.facility_id
     )
     
     # Format for frontend Notification interface
@@ -52,6 +53,7 @@ async def list_notifications(
             "actions": n.actions,
             "backend_source": n.backend_source,
             "createdAt": n.created_at.isoformat(),
+            "timestamp": n.created_at.isoformat(),
             "is_read": getattr(n, 'user_specific_read', n.is_read),
         } for n in notifications
     ]

@@ -681,6 +681,7 @@ class NotificationEventCreators:
                 "created_at": datetime.now(timezone.utc).isoformat(),
             },
             actions=["Send Welcome", "Configure Access", "Assign Patients"],
+            facility_id=facility.id,
             roles=["facility_admin"],
             backend_source="users",
             expires_at=datetime.now(timezone.utc) + timedelta(days=2),

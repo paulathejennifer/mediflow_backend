@@ -49,6 +49,7 @@ class NotificationService(NotificationEventCreators):
         roles: Optional[List[str]] = None,
         backend_source: str = "system",
         trigger_condition: Optional[str] = None,
+        facility_id: Optional[int] = None,
         user_id: Optional[int] = None,
         expires_at: Optional[datetime] = None,
     ) -> Notification:
@@ -59,6 +60,7 @@ class NotificationService(NotificationEventCreators):
 
         notification = Notification(
             user_id=user_id,
+            facility_id=facility_id,
             notification_type=notification_type,
             title=title,
             message=message,
@@ -92,9 +94,10 @@ class NotificationService(NotificationEventCreators):
         notification_type: Optional[str] = None,
         unread_only: bool = False,
         limit: int = 50,
+        facility_id: Optional[int] = None,
     ) -> List[Notification]:
         """Get notifications for a specific user"""
-        
+
         # Join with delivery to get user-specific read status for broadcast messages
         query = self.db.query(Notification, NotificationDelivery.delivery_status).outerjoin(
             NotificationDelivery, 
@@ -109,6 +112,11 @@ class NotificationService(NotificationEventCreators):
                     Notification.user_id.is_(None),
                     # PostgreSQL specific JSONB containment operator
                     Notification.roles.op('@>')([user_role]),
+                    # Scope to facility if provided
+                    or_(
+                        Notification.facility_id.is_(None),
+                        Notification.facility_id == facility_id
+                    )
                 ),
             )
         )
