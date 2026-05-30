@@ -45,10 +45,11 @@ with engine.connect() as conn:
         "ALTER TABLE notifications ALTER COLUMN roles TYPE JSONB USING (roles::jsonb)",
         "ALTER TABLE patient_identifiers ADD COLUMN IF NOT EXISTS identifier_type VARCHAR(50)",
         "ALTER TABLE patient_identifiers ADD COLUMN IF NOT EXISTS identifier_value VARCHAR(100)",
+        "ALTER TABLE patient_identifiers ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT TRUE",
         "UPDATE patient_identifiers SET identifier_type = 'MRN', identifier_value = mrn WHERE identifier_type IS NULL",
         "ALTER TABLE patient_identifiers ALTER COLUMN identifier_type SET NOT NULL",
         "ALTER TABLE patient_identifiers ALTER COLUMN identifier_value SET NOT NULL",
-
+        "ALTER TABLE patient_identifiers ALTER COLUMN is_primary SET NOT NULL",
     ]
     for q in queries:
         try:
@@ -91,9 +92,3 @@ else
     echo "Mode: Production (gunicorn + uvicorn workers)"
     exec gunicorn app.main:app -c gunicorn.conf.py
 fi
-
-
-
-
-
-
