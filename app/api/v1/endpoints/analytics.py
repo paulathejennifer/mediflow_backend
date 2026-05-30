@@ -402,7 +402,7 @@ def get_dashboard_kpis(
             
             total_referrals = facility_referrals.count()
             
-            # Average Referrals per Staff for Facility (Now moved after total_referrals calculation)
+            # Average Referrals per Staff for Facility (Safely handled after total_referrals calculation)
             total_staff = clinician_count + admin_count
             avg_referrals_per_staff = round(total_referrals / max(total_staff, 1), 1)
 

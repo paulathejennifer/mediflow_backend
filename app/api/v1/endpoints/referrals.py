@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -139,7 +139,11 @@ def list_referrals(
     current_user: User = Depends(get_current_user),
 ):
     """List referrals accessible to the current user."""
-    query = db.query(Referral)
+    query = db.query(Referral).options(
+        joinedload(Referral.patient),
+        joinedload(Referral.from_facility),
+        joinedload(Referral.to_facility)
+    )
 
     # Filter by user's facility (sender or receiver)
     if current_user.role != UserRole.SUPER_ADMIN:
@@ -165,21 +169,13 @@ def list_referrals(
     # Create summaries with related data
     result = []
     for referral in referrals:
-        patient = db.query(Patient).filter(Patient.id == referral.patient_id).first()
-        from_facility = (
-            db.query(Facility).filter(Facility.id == referral.from_facility_id).first()
-        )
-        to_facility = (
-            db.query(Facility).filter(Facility.id == referral.to_facility_id).first()
-        )
-
         summary = ReferralSummary(
             id=referral.id,
-            patient_name=f"{patient.first_name} {patient.last_name}"
-            if patient
+            patient_name=f"{referral.patient.first_name} {referral.patient.last_name}"
+            if referral.patient
             else "Unknown",
-            from_facility_name=from_facility.name if from_facility else "Unknown",
-            to_facility_name=to_facility.name if to_facility else "Unknown",
+            from_facility_name=referral.from_facility.name if referral.from_facility else "Unknown",
+            to_facility_name=referral.to_facility.name if referral.to_facility else "Unknown",
             status=referral.status,
             priority=referral.priority,
             created_at=referral.created_at,

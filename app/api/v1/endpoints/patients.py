@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -113,7 +113,7 @@ def list_patients(
 
     # Super admin can see all patients, others see facility-specific
     if current_user.role == UserRole.SUPER_ADMIN:
-        query = db.query(Patient)
+        query = db.query(Patient).options(joinedload(Patient.identifiers).joinedload(PatientIdentifier.facility))
         facility = None
     else:
         # Get facility
@@ -130,6 +130,7 @@ def list_patients(
             db.query(Patient)
             .join(PatientIdentifier)
             .filter(PatientIdentifier.facility_id == current_user.facility_id)
+            .options(joinedload(Patient.identifiers).joinedload(PatientIdentifier.facility))
         )
 
     # Apply search filter
@@ -146,24 +147,17 @@ def list_patients(
     # Load identifiers for each patient
     result = []
     for patient in patients:
-        # For Super Admin, we show all identifiers. For others, just their facility.
-        id_query = db.query(PatientIdentifier).filter(PatientIdentifier.patient_id == patient.id)
-        if current_user.role != UserRole.SUPER_ADMIN:
-            id_query = id_query.filter(PatientIdentifier.facility_id == current_user.facility_id)
-        
-        identifiers = id_query.all()
+        # Filter identifiers based on role (already loaded via joinedload)
+        identifiers = [
+            i for i in patient.identifiers 
+            if current_user.role == UserRole.SUPER_ADMIN or i.facility_id == current_user.facility_id
+        ]
 
         # Populate facility info
         for identifier in identifiers:
-            if facility:
-                identifier.facility_name = facility.name
-                identifier.facility_code = facility.facility_code
-            else:
-                # Fetch facility info for Super Admin view
-                fac = db.query(Facility).filter(Facility.id == identifier.facility_id).first()
-                if fac:
-                    identifier.facility_name = fac.name
-                    identifier.facility_code = fac.facility_code
+            if identifier.facility:
+                identifier.facility_name = identifier.facility.name
+                identifier.facility_code = identifier.facility.facility_code
 
         patient.identifiers = identifiers
         result.append(patient)

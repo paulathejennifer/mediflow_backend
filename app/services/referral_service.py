@@ -659,6 +659,8 @@ class ReferralService:
         except Exception as e:
             # Log error but don't fail the referral creation
             print(f"AI processing failed for referral {referral_id}: {str(e)}")
+        finally:
+            db.close()
 
     def _calculate_age(self, date_of_birth) -> int:
         """Calculate age from date of birth."""
