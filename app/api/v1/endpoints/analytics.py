@@ -267,7 +267,7 @@ def get_dashboard_kpis(
                 Facility.name, 
                 func.count(Referral.id).label('count')
             ).join(Referral, Facility.id == Referral.from_facility_id)\
-             .group_by(Facility.id)\
+             .group_by(Facility.id, Facility.name)\
              .order_by(func.count(Referral.id).desc()).first()
 
             quick_insights = []
