@@ -34,7 +34,7 @@ with engine.connect() as conn:
         "ALTER TABLE users ALTER COLUMN is_active TYPE BOOLEAN USING (is_active::boolean)",
         "ALTER TABLE facilities ADD COLUMN IF NOT EXISTS performance_score FLOAT DEFAULT 0.0",
         "ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS read_at TIMESTAMP WITH TIME ZONE",
-        "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS facility_id INTEGER REFERENCES facilities(id)"
+        "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS facility_id INTEGER REFERENCES facilities(id)",
         "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS read_at TIMESTAMP WITH TIME ZONE",
         "ALTER TABLE referrals ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP WITH TIME ZONE",
         "ALTER TABLE referrals ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP WITH TIME ZONE",
