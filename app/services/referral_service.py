@@ -179,6 +179,7 @@ class ReferralService:
             )
 
         referral.status = ReferralStatus.SUBMITTED
+        referral.submitted_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(referral)
 

@@ -25,41 +25,7 @@ done
 # Manual Schema Sync (Fix for missing columns on Free Render Tier)
 echo "Ensuring database schema is synchronized..."
 python <<'EOF_PYTHON_SCRIPT'
-from sqlalchemy import create_engine, text
-import os
-engine = create_engine(os.getenv('DATABASE_URL'))
-with engine.connect() as conn:
-    queries = [
-        "ALTER TABLE facilities ALTER COLUMN is_active TYPE BOOLEAN USING (is_active::boolean)",
-        "ALTER TABLE users ALTER COLUMN is_active TYPE BOOLEAN USING (is_active::boolean)",
-        "ALTER TABLE facilities ADD COLUMN IF NOT EXISTS performance_score FLOAT DEFAULT 0.0",
-        "ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS read_at TIMESTAMP WITH TIME ZONE",
-        "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS facility_id INTEGER REFERENCES facilities(id)",
-        "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS read_at TIMESTAMP WITH TIME ZONE",
-        "ALTER TABLE referrals ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP WITH TIME ZONE",
-        "ALTER TABLE referrals ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP WITH TIME ZONE",
-        "ALTER TABLE referrals ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP WITH TIME ZONE",
-        "ALTER TABLE referrals ADD COLUMN IF NOT EXISTS rejection_reason TEXT",
-        "ALTER TABLE audit_logs ALTER COLUMN details TYPE JSONB USING (details::jsonb)",
-        "ALTER TABLE notifications ALTER COLUMN details TYPE JSONB USING (details::jsonb)",
-        "ALTER TABLE notifications ALTER COLUMN actions TYPE JSONB USING (actions::jsonb)",
-        "ALTER TABLE notifications ALTER COLUMN roles TYPE JSONB USING (roles::jsonb)",
-        "ALTER TABLE patient_identifiers ADD COLUMN IF NOT EXISTS identifier_type VARCHAR(50)",
-        "ALTER TABLE patient_identifiers ADD COLUMN IF NOT EXISTS identifier_value VARCHAR(100)",
-        "ALTER TABLE patient_identifiers ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT TRUE",
-        "UPDATE patient_identifiers SET identifier_type = 'MRN', identifier_value = mrn WHERE identifier_type IS NULL",
-        "ALTER TABLE patient_identifiers ALTER COLUMN identifier_type SET NOT NULL",
-        "ALTER TABLE patient_identifiers ALTER COLUMN identifier_value SET NOT NULL",
-        "ALTER TABLE patient_identifiers ALTER COLUMN is_primary SET NOT NULL",
-    ]
-    for q in queries:
-        try:
-            print(f'Executing: {q}')
-            conn.execute(text(q))
-            conn.execute(text('COMMIT'))
-        except Exception as e:
-            print(f'Skipping sync query: {e}')
-    print('Manual schema sync complete.')
+print('Schema sync now handled by Alembic migrations.')
 EOF_PYTHON_SCRIPT
 
 # Run database migrations
@@ -93,4 +59,3 @@ else
     echo "Mode: Production (gunicorn + uvicorn workers)"
     exec gunicorn app.main:app -c gunicorn.conf.py
 fi
-
