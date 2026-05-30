@@ -112,10 +112,13 @@ class NotificationService(NotificationEventCreators):
                     Notification.user_id.is_(None),
                     # PostgreSQL specific JSONB containment operator
                     Notification.roles.op('@>')([user_role]),
-                    # Scope to facility if provided
-                    or_(
-                        Notification.facility_id.is_(None),
-                        Notification.facility_id == facility_id
+                    # If a facility_id is set on the notification, it MUST match the user's facility.
+                    # If it's NULL, it's a global system-wide broadcast.
+                    and_(
+                        or_(
+                            Notification.facility_id.is_(None),
+                            Notification.facility_id == facility_id
+                        )
                     )
                 ),
             )
