@@ -31,6 +31,7 @@ class ReferralResponse(ReferralBase):
     ai_summary: Optional[str] = None
     ai_status: Optional[str] = None
     notes: Optional[str] = None
+    reason_for_referral: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
