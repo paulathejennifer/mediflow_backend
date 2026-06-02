@@ -30,6 +30,7 @@ class UserCreate(BaseModel):
     last_name: str
     email: EmailStr
     password: str
+    phone: Optional[str] = None
     role: Optional[str] = "clinician"
     facility_id: Optional[int] = None
 
@@ -41,6 +42,7 @@ class UserResponse(BaseModel):
     first_name: str
     last_name: str
     email: str
+    phone: Optional[str] = None
     role: str
     facility_id: Optional[int] = None
     is_active: bool

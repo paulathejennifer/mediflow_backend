@@ -70,6 +70,7 @@ class AuthService:
             last_name=user_data.last_name,
             email=email,
             password_hash=password_hash,
+            phone=user_data.phone,
             role=user_data.role,
             facility_id=user_data.facility_id,
         )

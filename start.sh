@@ -7,17 +7,16 @@ echo "========================================="
 
 # Wait for database to be ready
 echo "Waiting for database..."
-for i in {1..30}; do
+for i in {1..15}; do
     python -c "
 from sqlalchemy import create_engine, text
 import os
 engine = create_engine(os.getenv('DATABASE_URL'))
 with engine.connect() as conn:
     conn.execute(text('SELECT 1'))
-    print('Database is ready!')
 " 2>/dev/null && break
     echo "  Attempt $i/30 - database not ready, waiting..."
-    sleep 2
+    sleep 1
 done
 
 
