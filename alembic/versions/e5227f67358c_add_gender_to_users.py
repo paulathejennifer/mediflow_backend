@@ -26,7 +26,8 @@ def upgrade() -> None:
 
     with op.batch_alter_table('notifications', schema=None) as batch_op:
         batch_op.add_column(sa.Column('facility_id', sa.Integer(), nullable=True))
-        batch_op.create_foreign_key(None, 'facilities', ['facility_id'], ['id'])
+        # FIXED: Provided a name 'fk_notifications_facility_id' for the foreign key
+        batch_op.create_foreign_key('fk_notifications_facility_id', 'facilities', ['facility_id'], ['id'])
 
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.add_column(sa.Column('gender', sa.String(), nullable=True))
@@ -40,7 +41,8 @@ def downgrade() -> None:
         batch_op.drop_column('gender')
 
     with op.batch_alter_table('notifications', schema=None) as batch_op:
-        batch_op.drop_constraint(None, type_='foreignkey')
+        # FIXED: Provided the name 'fk_notifications_facility_id' to drop the constraint
+        batch_op.drop_constraint('fk_notifications_facility_id', type_='foreignkey')
         batch_op.drop_column('facility_id')
 
     with op.batch_alter_table('audit_logs', schema=None) as batch_op:
