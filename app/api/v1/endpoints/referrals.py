@@ -343,7 +343,7 @@ async def submit_referral(
             details={"action": "submit", "status": ReferralStatus.SUBMITTED},
         )
 
-        # Notify receiving facility clinicians of new incoming referral
+        # FA001: Notify receiving facility clinicians of new incoming referral
         notif_service = get_notification_service(db)
         notif_service.create_incoming_referral_notification(referral)
 
@@ -374,7 +374,7 @@ async def accept_referral(
             status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
         )
 
-    if referral.status != ReferralStatus.SUBMITTED:
+    if referral.status not in [ReferralStatus.SUBMITTED, ReferralStatus.PENDING]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only submitted referrals can be accepted",
@@ -383,12 +383,11 @@ async def accept_referral(
     if current_user.facility_id != referral.to_facility_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only receiving facility clinicians can accept referrals",
+            detail="Only clinicians from the receiving facility can accept referrals",
         )
 
     try:
         referral.status = ReferralStatus.ACCEPTED
-        referral.accepted_at = func.now()
         db.commit()
         db.refresh(referral)
 
@@ -433,7 +432,7 @@ async def reject_referral(
             status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
         )
 
-    if referral.status != ReferralStatus.SUBMITTED:
+    if referral.status not in [ReferralStatus.SUBMITTED, ReferralStatus.PENDING]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only submitted referrals can be rejected",
@@ -441,7 +440,6 @@ async def reject_referral(
 
     try:
         referral.status = ReferralStatus.REJECTED
-        referral.rejected_at = func.now()
         db.commit()
 
         # Notify referring facility
