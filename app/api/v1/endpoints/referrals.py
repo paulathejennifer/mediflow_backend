@@ -110,7 +110,7 @@ async def create_referral(
             },
         )
 
-        # SA001: Trigger notification for urgent/emergency drafts
+        # Trigger notification for urgent/emergency drafts
         if referral.priority == Priority.EMERGENCY.value or referral.priority == "emergency":
             get_notification_service(db).create_incoming_referral_notification(referral)
 
@@ -301,6 +301,7 @@ def update_referral(
 
 
 @router.post("/{referral_id}/submit")
+@router.post("/{referral_id}/submit/")
 async def submit_referral(
     referral_id: int,
     db: Session = Depends(get_db),
@@ -342,7 +343,7 @@ async def submit_referral(
             details={"action": "submit", "status": ReferralStatus.SUBMITTED},
         )
 
-        # FA001: Notify receiving facility clinicians of new incoming referral
+        # Notify receiving facility clinicians of new incoming referral
         notif_service = get_notification_service(db)
         notif_service.create_incoming_referral_notification(referral)
 
@@ -356,7 +357,7 @@ async def submit_referral(
         )
 
 
-@router.post("/{referral_id}/accept", response_model=ReferralResponse)
+@router.post("/{referral_id}/accept")
 @router.post("/{referral_id}/accept/", response_model=ReferralResponse)
 async def accept_referral(
     referral_id: int,
@@ -415,7 +416,7 @@ async def accept_referral(
         )
 
 
-@router.post("/{referral_id}/reject", response_model=ReferralResponse)
+@router.post("/{referral_id}/reject")
 @router.post("/{referral_id}/reject/", response_model=ReferralResponse)
 async def reject_referral(
     referral_id: int,
@@ -443,7 +444,7 @@ async def reject_referral(
         referral.rejected_at = func.now()
         db.commit()
 
-        # Notify referring facility (Critical notification)
+        # Notify referring facility
         notif_service = get_notification_service(db)
         notif_service.create_referral_status_notification(referral)
 
