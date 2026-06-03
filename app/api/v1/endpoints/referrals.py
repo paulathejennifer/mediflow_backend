@@ -18,6 +18,7 @@ from app.models.facility import Facility
 from app.models.user import User
 from app.enums import UserRole, AuditAction, ReferralStatus, Priority
 from app.services.notification_service import get_notification_service
+from sqlalchemy import func
 
 router = APIRouter()
 
@@ -110,8 +111,6 @@ async def create_referral(
         )
 
         # SA001: Trigger notification for urgent/emergency drafts
-        # While clinicians usually check the dashboard, emergency drafts
-        # require immediate visibility.
         if referral.priority == Priority.EMERGENCY.value or referral.priority == "emergency":
             get_notification_service(db).create_incoming_referral_notification(referral)
 
@@ -354,4 +353,105 @@ async def submit_referral(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to submit referral: {str(e)}",
+        )
+
+
+@router.post("/{referral_id}/accept", response_model=ReferralResponse)
+@router.post("/{referral_id}/accept/", response_model=ReferralResponse)
+async def accept_referral(
+    referral_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Accept a submitted referral."""
+    permission_checker = get_permission_checker(current_user, db)
+    permission_checker.check_referral_access(referral_id)
+
+    referral = db.query(Referral).filter(Referral.id == referral_id).first()
+    if not referral:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
+        )
+
+    if referral.status != ReferralStatus.SUBMITTED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only submitted referrals can be accepted",
+        )
+
+    if current_user.facility_id != referral.to_facility_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only receiving facility clinicians can accept referrals",
+        )
+
+    try:
+        referral.status = ReferralStatus.ACCEPTED
+        referral.accepted_at = func.now()
+        db.commit()
+        db.refresh(referral)
+
+        # Log update
+        audit_logger = create_audit_logger(db)
+        audit_logger.log_action(
+            user_id=current_user.id,
+            action=AuditAction.UPDATE.value,
+            entity_type="referral",
+            entity_id=referral.id,
+            details={"action": "accept", "status": ReferralStatus.ACCEPTED},
+        )
+
+        # Notify referring facility
+        notif_service = get_notification_service(db)
+        notif_service.create_referral_status_notification(referral)
+
+        return referral
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to accept referral: {str(e)}",
+        )
+
+
+@router.post("/{referral_id}/reject", response_model=ReferralResponse)
+@router.post("/{referral_id}/reject/", response_model=ReferralResponse)
+async def reject_referral(
+    referral_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reject a submitted referral."""
+    permission_checker = get_permission_checker(current_user, db)
+    permission_checker.check_referral_access(referral_id)
+
+    referral = db.query(Referral).filter(Referral.id == referral_id).first()
+    if not referral:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
+        )
+
+    if referral.status != ReferralStatus.SUBMITTED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only submitted referrals can be rejected",
+        )
+
+    try:
+        referral.status = ReferralStatus.REJECTED
+        referral.rejected_at = func.now()
+        db.commit()
+
+        # Notify referring facility (Critical notification)
+        notif_service = get_notification_service(db)
+        notif_service.create_referral_status_notification(referral)
+
+        return referral
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reject referral: {str(e)}",
         )
