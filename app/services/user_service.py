@@ -91,6 +91,7 @@ class UserService:
             password_hash=get_password_hash(user_data.password),
             role=user_data.role,
             phone=user_data.phone,
+            gender=user_data.gender,
             facility_id=user_data.facility_id,
         )
 

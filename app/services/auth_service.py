@@ -71,6 +71,7 @@ class AuthService:
             email=email,
             password_hash=password_hash,
             phone=user_data.phone,
+            gender=user_data.gender,
             role=user_data.role,
             facility_id=user_data.facility_id,
         )

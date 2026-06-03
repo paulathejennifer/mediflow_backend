@@ -12,6 +12,7 @@ class User(Base):
     last_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     phone = Column(String, nullable=True)
+    gender = Column(String, nullable=True)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default=UserRole.CLINICIAN)
     facility_id = Column(Integer, ForeignKey("facilities.id", name="fk_user_facility"), nullable=True)

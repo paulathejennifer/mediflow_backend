@@ -14,6 +14,7 @@ class UserBase(BaseModel):
     last_name: str
     email: EmailStr
     phone: Optional[str] = None
+    gender: Optional[str] = None
     role: Optional[str] = "clinician"
     facility_id: Optional[int] = None
     is_active: Optional[bool] = True
@@ -30,6 +31,7 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
+    gender: Optional[str] = None
     role: Optional[str] = None
     facility_id: Optional[int] = None
     is_active: Optional[bool] = None
