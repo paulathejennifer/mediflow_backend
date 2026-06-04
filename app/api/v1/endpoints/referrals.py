@@ -34,6 +34,11 @@ async def create_referral(
     if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.FACILITY_ADMIN, UserRole.CLINICIAN]:
         raise HTTPException(status_code=403, detail="Permission denied")
     
+    if not current_user.facility_id and current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=400, detail="User must be assigned to a facility")
+    if not current_user.facility_id and current_user.role == UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=400, detail="Super Admin must select a source facility (not yet implemented in UI)")
+
     referral = Referral(
         patient_id=referral_data.patient_id,
         from_facility_id=current_user.facility_id,
@@ -89,16 +94,24 @@ def get_referral(
         raise HTTPException(status_code=404, detail="Referral not found")
     return referral
 
-@router.post("/{referral_id}/submit", response_model=ReferralResponse)
+@router.post("/{referral_id}/submit", response_model=ReferralWithDetails)
 @router.post("/{referral_id}/submit/")
 async def submit_referral(referral_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    referral = db.query(Referral).filter(Referral.id == referral_id).first()
+    referral = db.query(Referral).options(
+        joinedload(Referral.patient),
+        joinedload(Referral.from_facility),
+        joinedload(Referral.to_facility),
+        joinedload(Referral.creator),
+        joinedload(Referral.documents),
+        joinedload(Referral.voice_notes)
+    ).filter(Referral.id == referral_id).first()
+    
     if not referral:
         raise HTTPException(status_code=404, detail="Referral not found")
     referral.status = ReferralStatus.SUBMITTED
     db.commit()
     get_notification_service(db).create_incoming_referral_notification(referral)
-    return {"message": "Submitted"}
+    return referral
 
 @router.post("/{referral_id}/accept", response_model=ReferralWithDetails)
 @router.post("/{referral_id}/accept/", response_model=ReferralWithDetails)

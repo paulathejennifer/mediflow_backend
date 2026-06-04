@@ -10,6 +10,7 @@ class ReferralBase(BaseModel):
     reason_for_referral: Optional[str] = None
     clinical_notes: Optional[str] = None
 
+    model_config = ConfigDict(from_attributes=True)
 
 class ReferralCreate(ReferralBase):
     pass
