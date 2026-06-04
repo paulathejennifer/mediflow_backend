@@ -87,6 +87,7 @@ class AuditService:
             query.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit).all()
         )
 
+
     def get_user_activity_summary(self, user_id: int, days: int = 30) -> Dict[str, int]:
         """Get activity summary for a user."""
         from datetime import datetime, timedelta
