@@ -81,13 +81,15 @@ def get_referral(
         joinedload(Referral.patient),
         joinedload(Referral.from_facility),
         joinedload(Referral.to_facility),
-        joinedload(Referral.creator)
+        joinedload(Referral.creator),
+        joinedload(Referral.documents),
+        joinedload(Referral.voice_notes)
     ).filter(Referral.id == referral_id).first()
     if not referral:
         raise HTTPException(status_code=404, detail="Referral not found")
     return referral
 
-@router.post("/{referral_id}/submit")
+@router.post("/{referral_id}/submit", response_model=ReferralResponse)
 @router.post("/{referral_id}/submit/")
 async def submit_referral(referral_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     referral = db.query(Referral).filter(Referral.id == referral_id).first()
@@ -98,8 +100,8 @@ async def submit_referral(referral_id: int, db: Session = Depends(get_db), curre
     get_notification_service(db).create_incoming_referral_notification(referral)
     return {"message": "Submitted"}
 
-@router.post("/{referral_id}/accept")
-@router.post("/{referral_id}/accept/")
+@router.post("/{referral_id}/accept", response_model=ReferralWithDetails)
+@router.post("/{referral_id}/accept/", response_model=ReferralWithDetails)
 async def accept_referral(
     referral_id: int,
     db: Session = Depends(get_db),
@@ -109,7 +111,9 @@ async def accept_referral(
         joinedload(Referral.patient),
         joinedload(Referral.from_facility),
         joinedload(Referral.to_facility),
-        joinedload(Referral.creator)
+        joinedload(Referral.creator),
+        joinedload(Referral.documents),
+        joinedload(Referral.voice_notes)
     ).filter(Referral.id == referral_id).first()
     if not referral:
         raise HTTPException(status_code=404, detail="Referral not found")
@@ -129,8 +133,8 @@ async def accept_referral(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{referral_id}/reject")
-@router.post("/{referral_id}/reject/")
+@router.post("/{referral_id}/reject", response_model=ReferralWithDetails)
+@router.post("/{referral_id}/reject/", response_model=ReferralWithDetails)
 async def reject_referral(
     referral_id: int,
     db: Session = Depends(get_db),
@@ -140,7 +144,9 @@ async def reject_referral(
         joinedload(Referral.patient),
         joinedload(Referral.from_facility),
         joinedload(Referral.to_facility),
-        joinedload(Referral.creator)
+        joinedload(Referral.creator),
+        joinedload(Referral.documents),
+        joinedload(Referral.voice_notes)
     ).filter(Referral.id == referral_id).first()
     if not referral:
         raise HTTPException(status_code=404, detail="Referral not found")

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -35,8 +35,43 @@ class ReferralResponse(ReferralBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PatientDetail(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FacilityDetail(BaseModel):
+    id: int
+    name: str
+    facility_code: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserDetail(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentDetail(BaseModel):
+    id: int
+    file_name: str
+    file_type: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VoiceNoteDetail(BaseModel):
+    id: int
+    audio_file_name: str
+    status: str
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReferralSummary(BaseModel):
@@ -48,14 +83,13 @@ class ReferralSummary(BaseModel):
     priority: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReferralWithDetails(ReferralResponse):
-    patient: Optional[dict] = None
-    from_facility: Optional[dict] = None
-    to_facility: Optional[dict] = None
-    creator: Optional[dict] = None
-    documents: List[dict] = []
-    voice_notes: List[dict] = []
+    patient: Optional[PatientDetail] = None
+    from_facility: Optional[FacilityDetail] = None
+    to_facility: Optional[FacilityDetail] = None
+    creator: Optional[UserDetail] = None
+    documents: List[DocumentDetail] = []
+    voice_notes: List[VoiceNoteDetail] = []
