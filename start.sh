@@ -23,9 +23,24 @@ done
 
 # Manual Schema Sync (Fix for missing columns on Free Render Tier)
 echo "Ensuring database schema is synchronized..."
-python <<'EOF_PYTHON_SCRIPT'
-print('Schema sync now handled by Alembic migrations.')
-EOF_PYTHON_SCRIPT
+python - <<'PY'
+import os
+from sqlalchemy import create_engine, text
+try:
+    database_url = os.getenv('DATABASE_URL')
+    if database_url and database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(database_url)
+    with engine.connect() as conn:
+        print("Running manual column synchronization for 'referrals' table...")
+        # Fix for missing columns introduced in the notifications/tracking update
+        conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS accepted_by INTEGER"))
+        conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS rejected_by INTEGER"))
+        conn.commit()
+        print("Manual column synchronization complete.")
+except Exception as e:
+    print(f"Warning: Manual schema sync failed: {e}")
+PY
 
 # Run database migrations
 echo "Running database migrations..."
