@@ -46,5 +46,19 @@ class Referral(Base):
     documents = relationship("ReferralDocument", back_populates="referral")
     voice_notes = relationship("VoiceNote", back_populates="referral")
 
+    @property
+    def patient_name(self) -> str:
+        if self.patient:
+            return f"{self.patient.first_name} {self.patient.last_name}"
+        return "Unknown"
+
+    @property
+    def from_facility_name(self) -> str:
+        return self.from_facility.name if self.from_facility else "Unknown"
+
+    @property
+    def to_facility_name(self) -> str:
+        return self.to_facility.name if self.to_facility else "Unknown"
+
     def __repr__(self):
         return f"<Referral(id={self.id}, status={self.status}, priority={self.priority})>"

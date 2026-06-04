@@ -58,7 +58,11 @@ def list_referrals(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = db.query(Referral)
+    query = db.query(Referral).options(
+        joinedload(Referral.patient),
+        joinedload(Referral.from_facility),
+        joinedload(Referral.to_facility)
+    )
     if current_user.role != UserRole.SUPER_ADMIN:
         query = query.filter((Referral.from_facility_id == current_user.facility_id) | (Referral.to_facility_id == current_user.facility_id))
     if status:
@@ -137,4 +141,3 @@ async def reject_referral(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-
