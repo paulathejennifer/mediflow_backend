@@ -33,6 +33,15 @@ class ReferralResponse(ReferralBase):
     ai_status: Optional[str] = None
     notes: Optional[str] = None
     reason_for_referral: Optional[str] = None
+    
+    # Milestone Timestamps
+    submitted_at: Optional[datetime] = None
+    accepted_at: Optional[datetime] = None
+    rejected_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    accepted_by: Optional[int] = None
+    completed_by: Optional[int] = None
+
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -92,5 +101,8 @@ class ReferralWithDetails(ReferralResponse):
     from_facility: Optional[FacilityDetail] = None
     to_facility: Optional[FacilityDetail] = None
     creator: Optional[UserDetail] = None
+    accepted_by_user: Optional[UserDetail] = None
+    rejected_by_user: Optional[UserDetail] = None
+    completed_by_user: Optional[UserDetail] = None
     documents: List[DocumentDetail] = []
     voice_notes: List[VoiceNoteDetail] = []

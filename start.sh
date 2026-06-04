@@ -36,6 +36,8 @@ try:
         # Fix for missing columns introduced in the notifications/tracking update
         conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS accepted_by INTEGER"))
         conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS rejected_by INTEGER"))
+        conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS completed_by INTEGER"))
+        conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE"))
         conn.commit()
         print("Manual column synchronization complete.")
 except Exception as e:

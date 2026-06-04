@@ -16,6 +16,7 @@ class Referral(Base):
     # Track who processed the referral
     accepted_by = Column(Integer, ForeignKey("users.id", name="fk_referral_accepted_by"), nullable=True)
     rejected_by = Column(Integer, ForeignKey("users.id", name="fk_referral_rejected_by"), nullable=True)
+    completed_by = Column(Integer, ForeignKey("users.id", name="fk_referral_completed_by"), nullable=True)
     
     priority = Column(String, nullable=False, default=Priority.MEDIUM)
     status = Column(String, nullable=False, default=ReferralStatus.DRAFT)
@@ -28,6 +29,7 @@ class Referral(Base):
     submitted_at = Column(DateTime(timezone=True), nullable=True)
     accepted_at = Column(DateTime(timezone=True), nullable=True)
     rejected_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
     rejection_reason = Column(Text, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -42,6 +44,7 @@ class Referral(Base):
     # Relationships for processors
     accepted_by_user = relationship("User", foreign_keys=[accepted_by])
     rejected_by_user = relationship("User", foreign_keys=[rejected_by])
+    completed_by_user = relationship("User", foreign_keys=[completed_by])
     
     documents = relationship("ReferralDocument", back_populates="referral")
     voice_notes = relationship("VoiceNote", back_populates="referral")

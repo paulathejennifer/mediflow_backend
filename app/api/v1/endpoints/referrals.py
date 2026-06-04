@@ -102,6 +102,9 @@ async def submit_referral(referral_id: int, db: Session = Depends(get_db), curre
         joinedload(Referral.from_facility),
         joinedload(Referral.to_facility),
         joinedload(Referral.creator),
+        joinedload(Referral.accepted_by_user),
+        joinedload(Referral.rejected_by_user),
+        joinedload(Referral.completed_by_user),
         joinedload(Referral.documents),
         joinedload(Referral.voice_notes)
     ).filter(Referral.id == referral_id).first()
@@ -109,6 +112,7 @@ async def submit_referral(referral_id: int, db: Session = Depends(get_db), curre
     if not referral:
         raise HTTPException(status_code=404, detail="Referral not found")
     referral.status = ReferralStatus.SUBMITTED
+    referral.submitted_at = func.now()
     db.commit()
     get_notification_service(db).create_incoming_referral_notification(referral)
     return referral
@@ -125,6 +129,9 @@ async def accept_referral(
         joinedload(Referral.from_facility),
         joinedload(Referral.to_facility),
         joinedload(Referral.creator),
+        joinedload(Referral.accepted_by_user),
+        joinedload(Referral.rejected_by_user),
+        joinedload(Referral.completed_by_user),
         joinedload(Referral.documents),
         joinedload(Referral.voice_notes)
     ).filter(Referral.id == referral_id).first()
@@ -158,6 +165,9 @@ async def reject_referral(
         joinedload(Referral.from_facility),
         joinedload(Referral.to_facility),
         joinedload(Referral.creator),
+        joinedload(Referral.accepted_by_user),
+        joinedload(Referral.rejected_by_user),
+        joinedload(Referral.completed_by_user),
         joinedload(Referral.documents),
         joinedload(Referral.voice_notes)
     ).filter(Referral.id == referral_id).first()
@@ -168,6 +178,42 @@ async def reject_referral(
         referral.status = ReferralStatus.REJECTED
         referral.rejected_at = func.now()
         referral.rejected_by = current_user.id
+        db.commit()
+        db.refresh(referral)
+        get_notification_service(db).create_referral_status_notification(referral)
+        return referral
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{referral_id}/complete", response_model=ReferralWithDetails)
+@router.post("/{referral_id}/complete/", response_model=ReferralWithDetails)
+async def complete_referral(
+    referral_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    referral = db.query(Referral).options(
+        joinedload(Referral.patient),
+        joinedload(Referral.from_facility),
+        joinedload(Referral.to_facility),
+        joinedload(Referral.creator),
+        joinedload(Referral.accepted_by_user),
+        joinedload(Referral.completed_by_user),
+        joinedload(Referral.documents),
+        joinedload(Referral.voice_notes)
+    ).filter(Referral.id == referral_id).first()
+    
+    if not referral:
+        raise HTTPException(status_code=404, detail="Referral not found")
+    
+    if current_user.facility_id != referral.to_facility_id:
+        raise HTTPException(status_code=403, detail="Only the receiving facility can complete a referral")
+
+    try:
+        referral.status = ReferralStatus.COMPLETED
+        referral.completed_at = func.now()
+        referral.completed_by = current_user.id
         db.commit()
         db.refresh(referral)
         get_notification_service(db).create_referral_status_notification(referral)
