@@ -20,7 +20,8 @@ from app.enums import UserRole, AuditAction, ReferralStatus, Priority
 from app.services.notification_service import get_notification_service
 from sqlalchemy import func
 
-router = APIRouter()
+# redirect_slashes=True helps FastAPI handle /path and /path/ automatically
+router = APIRouter(redirect_slashes=True)
 
 
 @router.post("", response_model=ReferralResponse)
@@ -110,7 +111,7 @@ async def create_referral(
             },
         )
 
-        # Trigger notification for urgent/emergency drafts
+        # SA001: Trigger notification for urgent/emergency drafts
         if referral.priority == Priority.EMERGENCY.value or referral.priority == "emergency":
             get_notification_service(db).create_incoming_referral_notification(referral)
 
@@ -374,12 +375,14 @@ async def accept_referral(
             status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
         )
 
+    # Validation: Only submitted or pending can be accepted
     if referral.status not in [ReferralStatus.SUBMITTED, ReferralStatus.PENDING]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only submitted referrals can be accepted",
+            detail=f"Referral cannot be accepted in '{referral.status}' status",
         )
 
+    # Security: Only users from the receiving facility can accept
     if current_user.facility_id != referral.to_facility_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -388,6 +391,10 @@ async def accept_referral(
 
     try:
         referral.status = ReferralStatus.ACCEPTED
+        # Update timestamp if the column exists in your model
+        if hasattr(referral, 'accepted_at'):
+            referral.accepted_at = func.now()
+            
         db.commit()
         db.refresh(referral)
 
@@ -432,17 +439,40 @@ async def reject_referral(
             status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
         )
 
+    # Validation: Only submitted or pending can be rejected
     if referral.status not in [ReferralStatus.SUBMITTED, ReferralStatus.PENDING]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only submitted referrals can be rejected",
+            detail="Only submitted or pending referrals can be rejected",
+        )
+
+    # Security: Only users from the receiving facility can reject
+    if current_user.facility_id != referral.to_facility_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only clinicians from the receiving facility can reject referrals",
         )
 
     try:
         referral.status = ReferralStatus.REJECTED
+        # Update timestamp if the column exists in your model
+        if hasattr(referral, 'rejected_at'):
+            referral.rejected_at = func.now()
+            
         db.commit()
+        db.refresh(referral)
 
-        # Notify referring facility
+        # Log rejection
+        audit_logger = create_audit_logger(db)
+        audit_logger.log_action(
+            user_id=current_user.id,
+            action=AuditAction.UPDATE.value,
+            entity_type="referral",
+            entity_id=referral.id,
+            details={"action": "reject", "status": ReferralStatus.REJECTED},
+        )
+
+        # Notify referring facility (Critical notification)
         notif_service = get_notification_service(db)
         notif_service.create_referral_status_notification(referral)
 
