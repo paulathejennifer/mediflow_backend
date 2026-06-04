@@ -77,7 +77,12 @@ def get_referral(
     current_user: User = Depends(get_current_user),
 ):
     get_permission_checker(current_user, db).check_referral_access(referral_id)
-    referral = db.query(Referral).filter(Referral.id == referral_id).first()
+    referral = db.query(Referral).options(
+        joinedload(Referral.patient),
+        joinedload(Referral.from_facility),
+        joinedload(Referral.to_facility),
+        joinedload(Referral.creator)
+    ).filter(Referral.id == referral_id).first()
     if not referral:
         raise HTTPException(status_code=404, detail="Referral not found")
     return referral
@@ -100,7 +105,12 @@ async def accept_referral(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    referral = db.query(Referral).filter(Referral.id == referral_id).first()
+    referral = db.query(Referral).options(
+        joinedload(Referral.patient),
+        joinedload(Referral.from_facility),
+        joinedload(Referral.to_facility),
+        joinedload(Referral.creator)
+    ).filter(Referral.id == referral_id).first()
     if not referral:
         raise HTTPException(status_code=404, detail="Referral not found")
     
@@ -126,7 +136,12 @@ async def reject_referral(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    referral = db.query(Referral).filter(Referral.id == referral_id).first()
+    referral = db.query(Referral).options(
+        joinedload(Referral.patient),
+        joinedload(Referral.from_facility),
+        joinedload(Referral.to_facility),
+        joinedload(Referral.creator)
+    ).filter(Referral.id == referral_id).first()
     if not referral:
         raise HTTPException(status_code=404, detail="Referral not found")
 
