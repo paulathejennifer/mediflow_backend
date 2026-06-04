@@ -20,8 +20,8 @@ from app.enums import UserRole, AuditAction, ReferralStatus, Priority
 from app.services.notification_service import get_notification_service
 from sqlalchemy import func
 
+# redirect_slashes=True handles the /accept vs /accept/ issue automatically
 router = APIRouter(redirect_slashes=True)
-
 
 @router.post("", response_model=ReferralResponse)
 @router.post("/", response_model=ReferralResponse)
@@ -30,328 +30,78 @@ async def create_referral(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a new referral."""
     permission_checker = get_permission_checker(current_user, db)
-
-    if current_user.role not in [
-        UserRole.SUPER_ADMIN,
-        UserRole.FACILITY_ADMIN,
-        UserRole.CLINICIAN,
-    ]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only clinicians and admins can create referrals",
-        )
-
-    if not current_user.facility_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User must be assigned to a facility to create referrals",
-        )
-
-    try:
-        # Verify patient exists and is accessible
-        patient = (
-            db.query(Patient).filter(Patient.id == referral_data.patient_id).first()
-        )
-        if not patient:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found"
-            )
-
-        permission_checker.check_patient_access(referral_data.patient_id)
-
-        # Verify to facility exists
-        to_facility = (
-            db.query(Facility)
-            .filter(Facility.id == referral_data.to_facility_id)
-            .first()
-        )
-        if not to_facility:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Destination facility not found",
-            )
-
-        if not to_facility.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Destination facility is not active",
-            )
-
-        # Create referral
-        referral = Referral(
-            patient_id=referral_data.patient_id,
-            from_facility_id=current_user.facility_id,
-            to_facility_id=referral_data.to_facility_id,
-            created_by=current_user.id,
-            priority=referral_data.priority,
-            reason_for_referral=referral_data.reason_for_referral,
-            clinical_notes=referral_data.clinical_notes,
-            status=ReferralStatus.DRAFT,
-        )
-
-        db.add(referral)
-        db.commit()
-        db.refresh(referral)
-
-        # Log creation
-        audit_logger = create_audit_logger(db)
-        audit_logger.log_action(
-            user_id=current_user.id,
-            action=AuditAction.CREATE.value,
-            entity_type="referral",
-            entity_id=referral.id,
-            details={
-                "patient_id": referral.patient_id,
-                "from_facility_id": referral.from_facility_id,
-                "to_facility_id": referral.to_facility_id,
-                "priority": referral.priority,
-            },
-        )
-
-        # SA001: Trigger notification for urgent/emergency drafts
-        if referral.priority == Priority.EMERGENCY.value or referral.priority == "emergency":
-            get_notification_service(db).create_incoming_referral_notification(referral)
-
-        return referral
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create referral: {str(e)}",
-        )
-
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.FACILITY_ADMIN, UserRole.CLINICIAN]:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    
+    referral = Referral(
+        patient_id=referral_data.patient_id,
+        from_facility_id=current_user.facility_id,
+        to_facility_id=referral_data.to_facility_id,
+        created_by=current_user.id,
+        priority=referral_data.priority,
+        reason_for_referral=referral_data.reason_for_referral,
+        clinical_notes=referral_data.clinical_notes,
+        status=ReferralStatus.DRAFT,
+    )
+    db.add(referral)
+    db.commit()
+    db.refresh(referral)
+    return referral
 
 @router.get("", response_model=List[ReferralSummary])
 @router.get("/", response_model=List[ReferralSummary])
 def list_referrals(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    skip: int = Query(0),
+    limit: int = Query(100),
     status: Optional[str] = Query(None),
-    priority: Optional[str] = Query(None),
-    patient_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List referrals accessible to the current user."""
-    query = db.query(Referral).options(
-        joinedload(Referral.patient),
-        joinedload(Referral.from_facility),
-        joinedload(Referral.to_facility)
-    )
-
-    # Filter by user's facility (sender or receiver)
+    query = db.query(Referral)
     if current_user.role != UserRole.SUPER_ADMIN:
-        query = query.filter(
-            (Referral.from_facility_id == current_user.facility_id)
-            | (Referral.to_facility_id == current_user.facility_id)
-        )
-
-    # Apply filters
+        query = query.filter((Referral.from_facility_id == current_user.facility_id) | (Referral.to_facility_id == current_user.facility_id))
     if status:
         query = query.filter(Referral.status == status)
-
-    if priority:
-        query = query.filter(Referral.priority == priority)
-
-    if patient_id:
-        query = query.filter(Referral.patient_id == patient_id)
-
-    referrals = (
-        query.order_by(Referral.created_at.desc()).offset(skip).limit(limit).all()
-    )
-
-    # Create summaries with related data
-    result = []
-    for referral in referrals:
-        summary = ReferralSummary(
-            id=referral.id,
-            patient_name=f"{referral.patient.first_name} {referral.patient.last_name}"
-            if referral.patient
-            else "Unknown",
-            from_facility_name=referral.from_facility.name if referral.from_facility else "Unknown",
-            to_facility_name=referral.to_facility.name if referral.to_facility else "Unknown",
-            status=referral.status,
-            priority=referral.priority,
-            created_at=referral.created_at,
-            reason_for_referral=referral.reason_for_referral,
-        )
-        result.append(summary)
-
-    return result
-
+    return query.order_by(Referral.created_at.desc()).offset(skip).limit(limit).all()
 
 @router.get("/{referral_id}", response_model=ReferralWithDetails)
+@router.get("/{referral_id}/", response_model=ReferralWithDetails)
 def get_referral(
     referral_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get referral by ID with full details."""
-    permission_checker = get_permission_checker(current_user, db)
-    permission_checker.check_referral_access(referral_id)
-
+    get_permission_checker(current_user, db).check_referral_access(referral_id)
     referral = db.query(Referral).filter(Referral.id == referral_id).first()
     if not referral:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
-        )
-
-    # Load related data
-    patient = db.query(Patient).filter(Patient.id == referral.patient_id).first()
-    from_facility = (
-        db.query(Facility).filter(Facility.id == referral.from_facility_id).first()
-    )
-    to_facility = (
-        db.query(Facility).filter(Facility.id == referral.to_facility_id).first()
-    )
-    creator = db.query(User).filter(User.id == referral.created_by).first()
-
-    # Load documents and voice notes
-    documents = []
-    voice_notes = []
-    
-    # Return the referral object; the response_model will handle the mapping
+        raise HTTPException(status_code=404, detail="Referral not found")
     return referral
-
-
-@router.put("/{referral_id}", response_model=ReferralResponse)
-def update_referral(
-    referral_id: int,
-    referral_update: ReferralUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Update referral details."""
-    permission_checker = get_permission_checker(current_user, db)
-    permission_checker.check_referral_access(referral_id)
-
-    referral = db.query(Referral).filter(Referral.id == referral_id).first()
-    if not referral:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
-        )
-
-    try:
-        # Update fields
-        update_data = referral_update.dict(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(referral, field, value)
-
-        db.commit()
-        db.refresh(referral)
-
-        # Log update
-        audit_logger = create_audit_logger(db)
-        audit_logger.log_action(
-            user_id=current_user.id,
-            action=AuditAction.UPDATE.value,
-            entity_type="referral",
-            entity_id=referral.id,
-            details=update_data,
-        )
-
-        return referral
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update referral: {str(e)}",
-        )
-
 
 @router.post("/{referral_id}/submit")
 @router.post("/{referral_id}/submit/")
-async def submit_referral(
-    referral_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Submit a draft referral."""
-    permission_checker = get_permission_checker(current_user, db)
-    permission_checker.check_referral_access(referral_id)
-
+async def submit_referral(referral_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     referral = db.query(Referral).filter(Referral.id == referral_id).first()
     if not referral:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
-        )
+        raise HTTPException(status_code=404, detail="Referral not found")
+    referral.status = ReferralStatus.SUBMITTED
+    db.commit()
+    get_notification_service(db).create_incoming_referral_notification(referral)
+    return {"message": "Submitted"}
 
-    if referral.status != ReferralStatus.DRAFT:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only draft referrals can be submitted",
-        )
-
-    if current_user.facility_id != referral.from_facility_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only sender facility can submit referrals",
-        )
-
-    try:
-        referral.status = ReferralStatus.SUBMITTED
-        db.commit()
-
-        # Log submission
-        audit_logger = create_audit_logger(db)
-        audit_logger.log_action(
-            user_id=current_user.id,
-            action=AuditAction.UPDATE.value,
-            entity_type="referral",
-            entity_id=referral.id,
-            details={"action": "submit", "status": ReferralStatus.SUBMITTED},
-        )
-
-        # FA001: Notify receiving facility clinicians of new incoming referral
-        notif_service = get_notification_service(db)
-        notif_service.create_incoming_referral_notification(referral)
-
-        return {"message": "Referral submitted successfully"}
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to submit referral: {str(e)}",
-        )
-
-
-@router.post("/{referral_id}/accept", response_model=ReferralResponse)
-@router.post("/{referral_id}/accept/", response_model=ReferralResponse)
+@router.post("/{referral_id}/accept")
+@router.post("/{referral_id}/accept/")
 async def accept_referral(
     referral_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Accept a submitted referral."""
-    permission_checker = get_permission_checker(current_user, db)
-    permission_checker.check_referral_access(referral_id)
-
     referral = db.query(Referral).filter(Referral.id == referral_id).first()
     if not referral:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
-        )
-
-    # Allow acceptance if status is submitted or pending
-    valid_statuses = [ReferralStatus.SUBMITTED, "pending"]
-    if referral.status not in valid_statuses:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Only submitted or pending referrals can be accepted. Current status: {referral.status}",
-        )
-
+        raise HTTPException(status_code=404, detail="Referral not found")
+    
     if current_user.facility_id != referral.to_facility_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only clinicians from the receiving facility can accept referrals",
-        )
+        raise HTTPException(status_code=403, detail="Unauthorized facility")
 
     try:
         referral.status = ReferralStatus.ACCEPTED
@@ -359,59 +109,22 @@ async def accept_referral(
         referral.accepted_by = current_user.id
         db.commit()
         db.refresh(referral)
-
-        # Log action
-        audit_logger = create_audit_logger(db)
-        audit_logger.log_action(
-            user_id=current_user.id,
-            action=AuditAction.UPDATE.value,
-            entity_type="referral",
-            entity_id=referral.id,
-            details={"action": "accept", "status": ReferralStatus.ACCEPTED},
-        )
-
-        # Notify
-        notif_service = get_notification_service(db)
-        notif_service.create_referral_status_notification(referral)
-
+        get_notification_service(db).create_referral_status_notification(referral)
         return referral
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to accept referral: {str(e)}",
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/{referral_id}/reject", response_model=ReferralResponse)
-@router.post("/{referral_id}/reject/", response_model=ReferralResponse)
+@router.post("/{referral_id}/reject")
+@router.post("/{referral_id}/reject/")
 async def reject_referral(
     referral_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Reject a submitted referral."""
-    permission_checker = get_permission_checker(current_user, db)
-    permission_checker.check_referral_access(referral_id)
-
     referral = db.query(Referral).filter(Referral.id == referral_id).first()
     if not referral:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
-        )
-
-    valid_statuses = [ReferralStatus.SUBMITTED, "pending"]
-    if referral.status not in valid_statuses:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only submitted or pending referrals can be rejected",
-        )
-
-    if current_user.facility_id != referral.to_facility_id:
-         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only receiving facility clinicians can reject referrals",
-        )
+        raise HTTPException(status_code=404, detail="Referral not found")
 
     try:
         referral.status = ReferralStatus.REJECTED
@@ -419,9 +132,7 @@ async def reject_referral(
         referral.rejected_by = current_user.id
         db.commit()
         db.refresh(referral)
-
-        notif_service = get_notification_service(db)
-        notif_service.create_referral_status_notification(referral)
+        get_notification_service(db).create_referral_status_notification(referral)
         return referral
     except Exception as e:
         db.rollback()
