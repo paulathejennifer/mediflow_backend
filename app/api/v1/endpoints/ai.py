@@ -263,61 +263,65 @@ async def generate_referral_ai_summary(
         from app.services.referral_service import ReferralService
 
         referral_service = ReferralService(db)
-        referral_summary = referral_service.get_referral_summary(referral_id)
+        # Ensure we await the service call if it's async
+        referral_summary = await referral_service.get_referral_summary(referral_id)
 
         # Build context for AI
+        # Use .get() to prevent KeyErrors from crashing the 500
+        patient_info = referral_summary.get("patient_info", {})
+        referral_info = referral_summary.get("referral_info", {})
+        facility_info = referral_summary.get("facility_info", {})
+        attachments = referral_summary.get("attachments", {})
+
         context = {
-            "patient_name": f"{referral_summary['patient_info']['first_name']} {referral_summary['patient_info']['last_name']}"
-            if referral_summary["patient_info"]
+            "patient_name": f"{patient_info.get('first_name', '')} {patient_info.get('last_name', '')}".strip()
+            if patient_info
             else "Unknown",
             "age": referral_service._calculate_age(
-                referral_summary["patient_info"]["date_of_birth"]
+                patient_info.get("date_of_birth")
             )
-            if referral_summary["patient_info"]
-            and referral_summary["patient_info"]["date_of_birth"]
+            if patient_info and patient_info.get("date_of_birth")
             else "Unknown",
-            "gender": referral_summary["patient_info"]["gender"]
-            if referral_summary["patient_info"]
+            "gender": patient_info.get("gender")
+            if patient_info
             else "Unknown",
-            "allergies": referral_summary["patient_info"]["allergies"]
-            if referral_summary["patient_info"]
+            "allergies": patient_info.get("allergies")
+            if patient_info
             else "None",
-            "medications": referral_summary["patient_info"]["medications"]
-            if referral_summary["patient_info"]
+            "medications": patient_info.get("medications")
+            if patient_info
             else "None",
-            "chronic_conditions": referral_summary["patient_info"]["chronic_conditions"]
-            if referral_summary["patient_info"]
+            "chronic_conditions": patient_info.get("chronic_conditions")
+            if patient_info
             else "None",
-            "reason_for_referral": referral_summary["referral_info"][
-                "reason_for_referral"
-            ],
-            "priority": referral_summary["referral_info"]["priority"],
-            "from_facility": referral_summary["facility_info"]["from_facility"]["name"]
-            if referral_summary["facility_info"]["from_facility"]
+            "reason_for_referral": referral_info.get("reason_for_referral", "Not specified"),
+            "priority": referral_info.get("priority", "medium"),
+            "from_facility": facility_info.get("from_facility", {}).get("name")
+            if facility_info.get("from_facility")
             else "Unknown",
-            "to_facility": referral_summary["facility_info"]["to_facility"]["name"]
-            if referral_summary["facility_info"]["to_facility"]
+            "to_facility": facility_info.get("to_facility", {}).get("name")
+            if facility_info.get("to_facility")
             else "Unknown",
-            "clinical_notes": referral_summary["referral_info"]["clinical_notes"],
+            "clinical_notes": referral_info.get("clinical_notes", ""),
             "documents_summary": referral_service._summarize_documents(
-                referral_summary["attachments"]["documents"]
-            ),
+                attachments.get("documents", [])
+            ) if attachments else "None",
             "voice_transcripts": referral_service._summarize_voice_notes(
-                referral_summary["attachments"]["voice_notes"]
-            ),
+                attachments.get("voice_notes", [])
+            ) if attachments else "None",
             "created_at": (
-                referral_summary["referral_info"]["created_at"].strftime("%Y-%m-%d %H:%M")
-                if hasattr(referral_summary["referral_info"]["created_at"], "strftime")
-                else str(referral_summary["referral_info"]["created_at"])
+                referral_info["created_at"].strftime("%Y-%m-%d %H:%M")
+                if referral_info.get("created_at") and hasattr(referral_info["created_at"], "strftime")
+                else str(referral_info.get("created_at", "Unknown"))
             ),
-            "status": referral_summary["referral_info"]["status"],
+            "status": referral_info.get("status", "Unknown"),
         }
 
         # Generate AI summary
         summary_result = await ai_service.generate_referral_summary(context)
 
         # Update referral with AI summary
-        referral.ai_summary = summary_result.get("summary", "")
+        referral.ai_summary = summary_result.get("summary") if isinstance(summary_result, dict) else str(summary_result)
         referral.ai_status = "completed"
         db.commit()
 
@@ -328,7 +332,6 @@ async def generate_referral_ai_summary(
             "updated_by": current_user.email,
             "updated_at": str(db.execute(text("SELECT datetime('now')")).scalar()),
         }
-
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
