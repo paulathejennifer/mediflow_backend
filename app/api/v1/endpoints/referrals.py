@@ -87,6 +87,9 @@ def get_referral(
         joinedload(Referral.from_facility),
         joinedload(Referral.to_facility),
         joinedload(Referral.creator),
+        joinedload(Referral.accepted_by_user),
+        joinedload(Referral.rejected_by_user),
+        joinedload(Referral.completed_by_user),
         joinedload(Referral.documents),
         joinedload(Referral.voice_notes)
     ).filter(Referral.id == referral_id).first()
@@ -114,6 +117,7 @@ async def submit_referral(referral_id: int, db: Session = Depends(get_db), curre
     referral.status = ReferralStatus.SUBMITTED
     referral.submitted_at = func.now()
     db.commit()
+    db.refresh(referral)
     get_notification_service(db).create_incoming_referral_notification(referral)
     return referral
 
@@ -147,6 +151,7 @@ async def accept_referral(
         referral.accepted_by = current_user.id
         db.commit()
         db.refresh(referral)
+        db.refresh(referral)
         get_notification_service(db).create_referral_status_notification(referral)
         return referral
     except Exception as e:
@@ -179,6 +184,7 @@ async def reject_referral(
         referral.rejected_at = func.now()
         referral.rejected_by = current_user.id
         db.commit()
+        db.refresh(referral)
         db.refresh(referral)
         get_notification_service(db).create_referral_status_notification(referral)
         return referral
@@ -215,6 +221,7 @@ async def complete_referral(
         referral.completed_at = func.now()
         referral.completed_by = current_user.id
         db.commit()
+        db.refresh(referral)
         db.refresh(referral)
         get_notification_service(db).create_referral_status_notification(referral)
         return referral

@@ -305,8 +305,10 @@ async def generate_referral_ai_summary(
             "voice_transcripts": referral_service._summarize_voice_notes(
                 referral_summary["attachments"]["voice_notes"]
             ),
-            "created_at": referral_summary["referral_info"]["created_at"].strftime(
-                "%Y-%m-%d %H:%M"
+            "created_at": (
+                referral_summary["referral_info"]["created_at"].strftime("%Y-%m-%d %H:%M")
+                if hasattr(referral_summary["referral_info"]["created_at"], "strftime")
+                else str(referral_summary["referral_info"]["created_at"])
             ),
             "status": referral_summary["referral_info"]["status"],
         }
