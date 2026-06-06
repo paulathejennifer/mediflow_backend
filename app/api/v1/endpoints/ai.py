@@ -7,6 +7,7 @@ This module provides API endpoints for AI operations including:
 - AI status monitoring
 """
 
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func
@@ -424,7 +425,7 @@ def ai_health_check(db: Session = Depends(get_db)):
         return {
             "status": "healthy",
             "service": "mediflow-ai",
-            "timestamp": str(db.execute(text("SELECT datetime('now')")).scalar()),
+            "timestamp": str(db.query(func.now()).scalar()),
             "mock_mode": not bool(ai_service.api_key),
         }
 
