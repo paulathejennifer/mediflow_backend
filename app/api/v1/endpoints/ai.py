@@ -9,7 +9,7 @@ This module provides API endpoints for AI operations including:
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, func
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from app.core.database import get_db
@@ -118,7 +118,7 @@ async def test_referral_summary(
             "context": context,
             "ai_summary": summary_result,
             "tested_by": current_user.email,
-            "test_timestamp": str(db.execute(text("SELECT datetime('now')")).scalar()),
+            "test_timestamp": str(db.query(func.now()).scalar()),
         }
 
     except Exception as e:
@@ -170,7 +170,7 @@ async def test_transcription_cleanup(
             "context": context,
             "cleaned_transcript": cleanup_result,
             "tested_by": current_user.email,
-            "test_timestamp": str(db.execute(text("SELECT datetime('now')")).scalar()),
+            "test_timestamp": str(db.query(func.now()).scalar()),
         }
 
     except Exception as e:
@@ -223,7 +223,7 @@ async def test_document_extraction(
             "context": context,
             "extracted_info": extraction_result,
             "tested_by": current_user.email,
-            "test_timestamp": str(db.execute(text("SELECT datetime('now')")).scalar()),
+            "test_timestamp": str(db.query(func.now()).scalar()),
         }
 
     except Exception as e:
@@ -234,6 +234,7 @@ async def test_document_extraction(
 
 
 @router.post("/referral/{referral_id}/summarize")
+@router.post("/referral/{referral_id}/summarize/")
 async def generate_referral_ai_summary(
     referral_id: int,
     db: Session = Depends(get_db),
@@ -330,9 +331,11 @@ async def generate_referral_ai_summary(
             "referral_id": referral_id,
             "ai_summary": summary_result,
             "updated_by": current_user.email,
-            "updated_at": str(db.execute(text("SELECT datetime('now')")).scalar()),
+            "updated_at": str(db.query(func.now()).scalar()),
         }
     except Exception as e:
+        # Log the actual error to Render console so you can see what failed
+        print(f"CRITICAL AI ERROR for referral {referral_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"AI summary generation failed: {str(e)}",
