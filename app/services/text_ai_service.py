@@ -260,11 +260,12 @@ class TextAIService:
 
         for line in lines:
             line = line.strip()
-            if line.endswith(":") and line.isupper():
+            if ":" in line and any(header in line.upper() for header in ["SUMMARY", "FINDINGS", "RISKS", "INFO", "STEPS", "LEVEL", "NOTE"]):
                 # New section
-                current_section = line
-                sections[current_section] = ""
-            elif current_section and line:
+                current_section = line.split(":")[0].strip().upper()
+                content = line.split(":", 1)[1].strip()
+                sections[current_section] = content
+            elif current_section and line and line != sections.get(current_section):
                 # Add content to current section
                 if sections[current_section]:
                     sections[current_section] += "\n" + line

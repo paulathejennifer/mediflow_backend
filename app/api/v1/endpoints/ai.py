@@ -322,7 +322,11 @@ async def generate_referral_ai_summary(
         summary_result = await ai_service.generate_referral_summary(context)
 
         # Update referral with AI summary
-        referral.ai_summary = summary_result.get("summary") if isinstance(summary_result, dict) else str(summary_result)
+        # Save the whole dictionary as JSON so we don't lose key findings/risks
+        if isinstance(summary_result, dict):
+            referral.ai_summary = json.dumps(summary_result)
+        else:
+            referral.ai_summary = str(summary_result)
         referral.ai_status = "completed"
         db.commit()
 
