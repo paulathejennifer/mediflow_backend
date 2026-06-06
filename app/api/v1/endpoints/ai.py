@@ -64,7 +64,7 @@ class DocumentExtractionRequest(BaseModel):
 
 
 @router.post("/test-summary")
-def test_referral_summary(
+async def test_referral_summary(
     request: ReferralSummaryRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -111,7 +111,7 @@ def test_referral_summary(
         }
 
         # Generate AI summary
-        summary_result = ai_service.generate_referral_summary(context)
+        summary_result = await ai_service.generate_referral_summary(context)
 
         return {
             "success": True,
@@ -129,7 +129,7 @@ def test_referral_summary(
 
 
 @router.post("/test-transcription")
-def test_transcription_cleanup(
+async def test_transcription_cleanup(
     request: TranscriptionCleanupRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -163,7 +163,7 @@ def test_transcription_cleanup(
         }
 
         # Clean transcription
-        cleanup_result = ai_service.clean_transcription(context)
+        cleanup_result = await ai_service.clean_transcription(context)
 
         return {
             "success": True,
@@ -181,7 +181,7 @@ def test_transcription_cleanup(
 
 
 @router.post("/test-document-extraction")
-def test_document_extraction(
+async def test_document_extraction(
     request: DocumentExtractionRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -216,7 +216,7 @@ def test_document_extraction(
         }
 
         # Extract document information
-        extraction_result = ai_service.extract_document_info(context)
+        extraction_result = await ai_service.extract_document_info(context)
 
         return {
             "success": True,
@@ -263,8 +263,8 @@ async def generate_referral_ai_summary(
         from app.services.referral_service import ReferralService
 
         referral_service = ReferralService(db)
-        # Ensure we await the service call if it's async
-        referral_summary = await referral_service.get_referral_summary(referral_id)
+        # Removed await as get_referral_summary is synchronous with standard Session
+        referral_summary = referral_service.get_referral_summary(referral_id) or {}
 
         # Build context for AI
         # Use .get() to prevent KeyErrors from crashing the 500
