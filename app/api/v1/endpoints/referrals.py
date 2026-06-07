@@ -118,7 +118,10 @@ async def submit_referral(referral_id: int, db: Session = Depends(get_db), curre
     referral.submitted_at = func.now()
     db.commit()
     db.refresh(referral)
-    get_notification_service(db).create_incoming_referral_notification(referral)
+    try:
+        get_notification_service(db).create_incoming_referral_notification(referral)
+    except Exception as e:
+        print(f"Non-critical error: Failed to send notification for referral {referral_id}: {str(e)}")
     return referral
 
 @router.post("/{referral_id}/accept", response_model=ReferralWithDetails)

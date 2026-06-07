@@ -244,9 +244,8 @@ class NotificationEventCreators:
         """FA001: Incoming Referral"""
         priority_emoji = {
             Priority.EMERGENCY.value: "🚨",
-            Priority.URGENT.value: "⚠️",
-            Priority.HIGH.value: "📌",
-            Priority.NORMAL.value: "📋",
+            Priority.HIGH.value: "⚠️",
+            Priority.MEDIUM.value: "📋",
             Priority.LOW.value: "ℹ️",
         }
         
