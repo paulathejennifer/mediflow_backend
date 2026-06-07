@@ -60,6 +60,7 @@ class TextAIService:
                 "summary": summary_data.get("SUMMARY", ""),
                 "key_findings": summary_data.get("KEY CLINICAL FINDINGS", ""),
                 "risks": summary_data.get("KEY RISKS", ""),
+                "completeness_score": summary_data.get("COMPLETENESS SCORE", "7/10"),
                 "missing_info": summary_data.get("MISSING CRITICAL INFORMATION", ""),
                 "next_steps": summary_data.get("RECOMMENDED NEXT STEPS", ""),
                 "uncertainty_level": summary_data.get("UNCERTAINTY LEVEL", "Medium"),
@@ -260,7 +261,7 @@ class TextAIService:
 
         for line in lines:
             line = line.strip()
-            if ":" in line and any(header in line.upper() for header in ["SUMMARY", "FINDINGS", "RISKS", "INFO", "STEPS", "LEVEL", "NOTE"]):
+            if ":" in line and any(header in line.upper() for header in ["SUMMARY", "FINDINGS", "RISKS", "INFO", "STEPS", "LEVEL", "NOTE", "SCORE"]):
                 # New section
                 current_section = line.split(":")[0].strip().upper()
                 content = line.split(":", 1)[1].strip()

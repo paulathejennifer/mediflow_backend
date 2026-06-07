@@ -279,6 +279,7 @@ async def generate_referral_ai_summary(
             "patient_name": f"{patient_info.get('first_name', '')} {patient_info.get('last_name', '')}".strip()
             if patient_info
             else "Unknown",
+            "date_of_birth": str(patient_info.get("date_of_birth", "Unknown")),
             "age": referral_service._calculate_age(
                 patient_info.get("date_of_birth")
             )
