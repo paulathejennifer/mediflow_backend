@@ -90,9 +90,6 @@ def list_facilities(
     if level:
         query = query.filter(Facility.level == level)
 
-    # Non-super admins can only see their own facility
-    if current_user.role != UserRole.SUPER_ADMIN and current_user.facility_id:
-        query = query.filter(Facility.id == current_user.facility_id)
 
     facilities = query.offset(skip).limit(limit).all()
 
