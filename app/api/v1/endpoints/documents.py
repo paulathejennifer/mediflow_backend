@@ -44,25 +44,13 @@ async def upload_document(
         )
 
     try:
-        # Handle file upload
-        document_handler = DocumentHandler()
-        file_metadata = await document_handler.handle_upload(
-            file, referral_id, current_user.id
-        )
-
-        # Create document record
-        # Remove file_type from metadata as it's the file extension, not document type
-        file_metadata.pop("file_type", None)
-        document = ReferralDocument(
+        service = get_document_service(db)
+        document = await service.upload_document(
             referral_id=referral_id,
-            uploaded_by=current_user.id,
+            file=file,
             file_type=file_type,
-            **file_metadata,
+            uploader_id=current_user.id
         )
-
-        db.add(document)
-        db.commit()
-        db.refresh(document)
 
         # Log upload
         audit_logger = create_audit_logger(db)
@@ -75,7 +63,7 @@ async def upload_document(
                 "referral_id": referral_id,
                 "file_name": file.filename,
                 "file_type": file_type,
-                "file_size": file_metadata["file_size"],
+                "file_size": document.file_size,
             },
         )
 

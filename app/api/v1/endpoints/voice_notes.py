@@ -15,6 +15,37 @@ from app.enums import UserRole, AuditAction, VoiceStatus
 router = APIRouter()
 
 
+@router.post("/transcribe-raw")
+async def transcribe_raw_audio(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Transcribe audio without saving it to a referral (for preview during creation)."""
+    try:
+        from app.services.speech_ai_service import speech_ai_service
+        import tempfile
+        import os
+
+        # Save to temp file for processing
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result = await speech_ai_service.transcribe_audio(tmp_path)
+            return result
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Transcription failed: {str(e)}",
+        )
+
+
 @router.post("/upload", response_model=VoiceNoteResponse)
 async def upload_voice_note(
     referral_id: int,
@@ -34,25 +65,12 @@ async def upload_voice_note(
         )
 
     try:
-        # Handle audio file upload
-        audio_handler = AudioHandler()
-        audio_metadata = await audio_handler.handle_upload(
-            file, referral_id, current_user.id
+        service = get_voice_service(db)
+        voice_note = await service.upload_voice_note(
+            referral_id=referral_id, 
+            file=file, 
+            uploader_id=current_user.id
         )
-
-        # Create voice note record
-        # Remove mime_type from metadata as VoiceNote model doesn't have this field
-        audio_metadata.pop("mime_type", None)
-        voice_note = VoiceNote(
-            referral_id=referral_id,
-            uploaded_by=current_user.id,
-            status=VoiceStatus.UPLOADED,
-            **audio_metadata,
-        )
-
-        db.add(voice_note)
-        db.commit()
-        db.refresh(voice_note)
 
         # Log upload
         audit_logger = create_audit_logger(db)
@@ -64,7 +82,7 @@ async def upload_voice_note(
             details={
                 "referral_id": referral_id,
                 "file_name": file.filename,
-                "file_size": audio_metadata["audio_file_size"],
+                "file_size": voice_note.audio_file_size,
             },
         )
 
