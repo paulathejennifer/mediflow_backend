@@ -19,6 +19,11 @@ class S3Storage:
 
     async def upload_file(self, file: UploadFile, folder: str) -> dict:
         """Uploads a file to S3 and returns metadata."""
+        # Calculate file size before uploading
+        content = await file.read()
+        file_size = len(content)
+        await file.seek(0) # Reset file pointer for the actual upload
+
         file_extension = os.path.splitext(file.filename)[1]
         # Generate a unique key for medical privacy and to avoid collisions
         file_key = f"{folder}/{uuid.uuid4()}{file_extension}"
@@ -34,10 +39,10 @@ class S3Storage:
         )
         
         return {
-            "file_path": file_key, # We store the S3 Key in the DB
-            "file_name": file.filename,
-            "mime_type": file.content_type,
-            "file_size": 0 # We'll update this if needed
+            "path": file_key,
+            "name": file.filename,
+            "mime": file.content_type,
+            "size": file_size
         }
 
     def generate_presigned_url(self, file_key: str, expires_in: int = 3600):

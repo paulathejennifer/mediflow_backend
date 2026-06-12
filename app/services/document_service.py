@@ -60,14 +60,17 @@ class DocumentService:
         try:
             # Handle file upload to Cloud Storage
             folder = f"referral_{referral_id}/documents"
-            file_metadata = await s3_storage.upload_file(file, folder)
+            meta = await s3_storage.upload_file(file, folder)
 
             # Create document record
             document = ReferralDocument(
                 referral_id=referral_id,
                 uploaded_by=uploader_id,
                 file_type=file_type,
-                **file_metadata,
+                file_path=meta["path"],
+                file_name=meta["name"],
+                file_size=meta["size"],
+                mime_type=meta["mime"]
             )
 
             self.db.add(document)
@@ -402,8 +405,10 @@ class DocumentService:
 
     async def _trigger_text_extraction(self, document_id: int) -> None:
         """Trigger AI text extraction for document (async)."""
+        from app.core.database import SessionLocal
+        db = SessionLocal()
         try:
-            document = self.get_document_by_id(document_id)
+            document = db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
             if not document:
                 return
 
@@ -411,14 +416,13 @@ class DocumentService:
             extracted_text = await self._extract_text_from_file(document)
 
             if extracted_text:
-                # Update document with extracted text
-                self.update_document_metadata(document_id, extracted_text, True)
-
-                # Trigger AI analysis for medical content
-                self._trigger_medical_analysis(document_id, extracted_text)
-
+                document.extracted_text = extracted_text
+                document.ai_processed = True
+                db.commit()
         except Exception as e:
             print(f"Text extraction failed for document {document_id}: {str(e)}")
+        finally:
+            db.close()
 
     async def _extract_text_from_file(self, document: ReferralDocument) -> str:
         """Extract text from document file using DocumentAIService."""

@@ -261,7 +261,6 @@ class TextAIService:
 
         for line in lines:
             line = line.strip()
-            # Strict header matching to avoid clashing with bolded text like **Referral Note:**
             header_keywords = [
                 "CLEANED TRANSCRIPTION", "TERMINOLOGY CORRECTIONS", "SUMMARY", 
                 "KEY CLINICAL FINDINGS", "KEY RISKS", "MISSING CRITICAL INFORMATION", 
@@ -269,10 +268,16 @@ class TextAIService:
                 "ABNORMAL RESULTS", "RECOMMENDATIONS", "COMPLETENESS SCORE"
             ]
             
-            if ":" in line and any(line.upper().startswith(h) or f"**{h}" in line.upper() for h in header_keywords):
+            # Check if line looks like a header (e.g., "SUMMARY:" or "**SUMMARY:**")
+            is_header = False
+            if ":" in line:
+                upper_line = line.upper().replace("*", "").strip()
+                if any(upper_line.startswith(h) for h in header_keywords):
+                    is_header = True
+
+            if is_header:
                 # New section
-                current_section = line.split(":")[0].strip().upper()
-                current_section = current_section.replace("*", "").replace("#", "")
+                current_section = line.split(":")[0].strip().upper().replace("*", "").replace("#", "")
                 content = line.split(":", 1)[1].strip()
                 sections[current_section] = content
             elif current_section and line and line != sections.get(current_section):

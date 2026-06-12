@@ -51,14 +51,16 @@ class VoiceService:
         try:
             # Handle audio file upload to Cloud Storage
             folder = f"referral_{referral_id}/voice_notes"
-            audio_metadata = await s3_storage.upload_file(file, folder)
+            meta = await s3_storage.upload_file(file, folder)
 
             # Create voice note record
             voice_note = VoiceNote(
                 referral_id=referral_id,
                 uploaded_by=uploader_id,
                 status=VoiceStatus.UPLOADED,
-                **audio_metadata,
+                audio_path=meta["path"],
+                audio_file_name=meta["name"],
+                audio_file_size=meta["size"]
             )
 
             self.db.add(voice_note)
@@ -430,14 +432,16 @@ class VoiceService:
 
     def _trigger_transcription(self, voice_note_id: int) -> None:
         """Trigger audio transcription (async)."""
+        from app.core.database import SessionLocal
+        db = SessionLocal()
         try:
-            voice_note = self.get_voice_note_by_id(voice_note_id)
+            voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).first()
             if not voice_note:
                 return
 
             # Update status to processing
             voice_note.status = VoiceStatus.PROCESSING
-            self.db.commit()
+            db.commit()
 
             # Perform transcription (mock implementation)
             transcript = self._transcribe_audio(voice_note)
@@ -446,11 +450,13 @@ class VoiceService:
                 # Update with raw transcript
                 voice_note.transcript = transcript
                 voice_note.status = VoiceStatus.TRANSCRIBED
-                self.db.commit()
+                db.commit()
 
                 # Trigger AI cleanup
                 self._trigger_transcript_cleanup(voice_note_id, transcript)
-
+        finally:
+            db.close()
+            
         except Exception as e:
             # Update status to failed
             voice_note = self.get_voice_note_by_id(voice_note_id)
