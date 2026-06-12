@@ -95,6 +95,11 @@ class SpeechAIService:
             if wav_path != current_path and os.path.exists(wav_path):
                 os.remove(wav_path)
 
+            # Ensure the first letter is capitalized
+            if transcript:
+                transcript = transcript.strip()
+                transcript = transcript[0].upper() + transcript[1:] if len(transcript) > 0 else transcript
+
             if not success or not transcript:
                 raise Exception(
                     "Speech recognition failed - could not understand audio"

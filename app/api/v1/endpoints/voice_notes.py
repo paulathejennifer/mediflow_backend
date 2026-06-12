@@ -34,8 +34,31 @@ async def transcribe_raw_audio(
             tmp_path = tmp.name
 
         try:
-            result = await speech_ai_service.transcribe_audio(tmp_path)
-            return result
+            # 1. Get the raw text from Google
+            speech_result = await speech_ai_service.transcribe_audio(tmp_path)
+            raw_text = speech_result.get("transcript", "")
+            
+            if not raw_text:
+                return speech_result
+
+            # 2. Use Llama 3.1 to clean up medical terms and units (kg vs km)
+            from app.services.ai_service import AIService
+            ai_service = AIService(db)
+            
+            cleanup_result = await ai_service.clean_transcription({
+                "raw_transcript": raw_text,
+                "patient_name": "Patient", # Context is generic for previews
+                "referral_reason": "Clinical Assessment",
+                "specialty": "General Medicine"
+            })
+            
+            # Return the polished transcript
+            return {
+                "transcript": cleanup_result.get("cleaned_transcript", raw_text),
+                "raw_transcript": raw_text,
+                "corrections": cleanup_result.get("corrections", ""),
+                "processing_info": speech_result.get("processing_info", {})
+            }
         finally:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
