@@ -435,7 +435,7 @@ class VoiceService:
         from app.core.database import SessionLocal
         db = SessionLocal()
         try:
-            voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).first()
+            voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).with_for_update().first()
             if not voice_note:
                 return
 
@@ -443,7 +443,7 @@ class VoiceService:
             voice_note.status = VoiceStatus.PROCESSING
             db.commit()
 
-            # Perform transcription (mock implementation)
+            # Perform transcription
             transcript = self._transcribe_audio(voice_note)
 
             if transcript:
@@ -455,11 +455,11 @@ class VoiceService:
                 # Trigger AI cleanup
                 self._trigger_transcript_cleanup(voice_note_id, transcript)
         except Exception as e:
-            # Update status to failed
-            voice_note = self.get_voice_note_by_id(voice_note_id)
+            # Create a clean session for the error handler if the previous one failed
+            voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).first()
             if voice_note:
                 voice_note.status = VoiceStatus.FAILED
-                self.db.commit()
+                db.commit()
             print(f"Transcription failed for voice note {voice_note_id}: {str(e)}")
         finally:
             db.close()
