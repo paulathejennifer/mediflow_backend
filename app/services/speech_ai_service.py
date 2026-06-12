@@ -11,9 +11,8 @@ import tempfile
 import logging
 from typing import Dict, Any, Optional, Tuple
 import speech_recognition as sr
-import librosa
-import soundfile as sf
-import numpy as np
+import subprocess
+import json
 from app.core.config import settings
 from app.utils.s3_storage import s3_storage
 
@@ -147,11 +146,9 @@ class SpeechAIService:
                 f"converted_{os.path.splitext(os.path.basename(audio_path))[0]}.wav",
             )
 
-            # Load audio
-            y, sr_rate = librosa.load(audio_path, sr=None)
-
-            # Save as WAV
-            sf.write(wav_path, y, sr_rate)
+            # Use ffmpeg directly for robust conversion
+            command = ['ffmpeg', '-i', audio_path, '-ar', '16000', '-ac', '1', wav_path, '-y']
+            subprocess.run(command, check=True, capture_output=True)
 
             logger.info(f"Audio converted to WAV: {audio_path} -> {wav_path}")
             return wav_path
@@ -163,9 +160,13 @@ class SpeechAIService:
     def _get_audio_duration(self, audio_path: str) -> float:
         """Get audio duration in seconds."""
         try:
-            y, sr_rate = librosa.load(audio_path, sr=None)
-            duration = len(y) / sr_rate
-            return round(duration, 2)
+            command = [
+                'ffprobe', '-v', 'quiet', '-print_format', 'json', 
+                '-show_format', audio_path
+            ]
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            data = json.loads(result.stdout)
+            return round(float(data['format']['duration']), 2)
         except Exception:
             return 0.0
 
