@@ -66,7 +66,8 @@ class VoiceService:
             self.db.refresh(voice_note)
 
             # Trigger transcription processing
-            self._trigger_transcription(voice_note.id)
+            # Run as a background task to prevent request timeouts
+            asyncio.create_task(asyncio.to_thread(self._trigger_transcription, voice_note.id))
 
             return voice_note
 

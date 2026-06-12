@@ -75,7 +75,8 @@ class DocumentService:
             self.db.refresh(document)
 
             # Trigger AI processing for text extraction
-            await self._trigger_text_extraction(document.id)
+            # Run as a background task so the API responds immediately
+            asyncio.create_task(self._trigger_text_extraction(document.id))
 
             return document
 
