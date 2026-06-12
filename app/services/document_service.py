@@ -15,7 +15,7 @@ from app.models.referral_document import ReferralDocument
 from app.models.referral import Referral
 from app.services.ai_service import AIService
 from app.services.document_ai_service import DocumentAIService
-from app.utils.file_utils import DocumentHandler
+from app.utils.s3_storage import s3_storage
 from app.enums import DocumentType
 from typing import List, Optional, Dict, Any
 import os
@@ -58,11 +58,9 @@ class DocumentService:
             )
 
         try:
-            # Handle file upload
-            document_handler = DocumentHandler()
-            file_metadata = await document_handler.handle_upload(
-                file, referral_id, uploader_id
-            )
+            # Handle file upload to Cloud Storage
+            folder = f"referral_{referral_id}/documents"
+            file_metadata = await s3_storage.upload_file(file, folder)
 
             # Create document record
             document = ReferralDocument(

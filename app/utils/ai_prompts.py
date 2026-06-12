@@ -169,6 +169,12 @@ EXTRACTION INSTRUCTIONS:
 1. Pull only clinically relevant information
 2. Include numerical values and units
 3. Note any abnormal or critical findings
+4. PERFORM MEDICAL ENTITY RECOGNITION: 
+   Identify and categorize all mentions of:
+   - DISEASES (e.g., Hypertension)
+   - DRUGS (e.g., Amlodipine)
+   - SYMPTOMS (e.g., Dyspnea)
+   - ANATOMICAL SITES (e.g., Left Ventricle)
 4. Preserve dates and timelines
 5. Identify recommended actions
 6. Flag any urgent concerns

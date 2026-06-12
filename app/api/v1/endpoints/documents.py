@@ -4,7 +4,7 @@ from typing import List
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.utils.permissions import get_permission_checker
-from app.utils.file_utils import DocumentHandler
+from app.services.document_service import get_document_service
 from app.utils.audit_utils import create_audit_logger
 from app.schemas.document import DocumentResponse, DocumentSummary
 from app.models.referral_document import ReferralDocument

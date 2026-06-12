@@ -20,6 +20,7 @@ from PIL import Image
 import cv2
 import numpy as np
 from app.core.config import settings
+from app.utils.s3_storage import s3_storage
 
 logger = logging.getLogger(__name__)
 

@@ -15,6 +15,7 @@ import librosa
 import soundfile as sf
 import numpy as np
 from app.core.config import settings
+from app.utils.s3_storage import s3_storage
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +52,18 @@ class SpeechAIService:
         Returns:
             Dictionary with transcription results and metadata
         """
+        temp_s3_path = None
         try:
-            # Convert audio to WAV format if needed (Google Speech Recognition requires WAV)
-            wav_path = await self._convert_to_wav(audio_path)
+            # Check if this is an S3 path (not a local file)
+            if "/" in audio_path and not os.path.exists(audio_path):
+                logger.info(f"Downloading audio {audio_path} from S3...")
+                temp_s3_path = s3_storage.download_to_temp_file(audio_path)
+                current_path = temp_s3_path
+            else:
+                current_path = audio_path
+
+            # Convert audio to WAV format if needed
+            wav_path = await self._convert_to_wav(current_path)
 
             # Get audio duration
             duration = self._get_audio_duration(wav_path)
@@ -83,7 +93,7 @@ class SpeechAIService:
             transcript, success = await loop.run_in_executor(None, sync_transcribe)
 
             # Clean up converted WAV file if different from original
-            if wav_path != audio_path and os.path.exists(wav_path):
+            if wav_path != current_path and os.path.exists(wav_path):
                 os.remove(wav_path)
 
             if not success or not transcript:
@@ -111,6 +121,9 @@ class SpeechAIService:
         except Exception as e:
             logger.error(f"Audio transcription failed: {str(e)}")
             raise Exception(f"Failed to transcribe audio: {str(e)}")
+        finally:
+            if temp_s3_path and os.path.exists(temp_s3_path):
+                os.remove(temp_s3_path)
 
     async def _convert_to_wav(self, audio_path: str) -> str:
         """

@@ -14,7 +14,7 @@ from fastapi import HTTPException, status, UploadFile
 from app.models.voice_note import VoiceNote
 from app.models.referral import Referral
 from app.services.ai_service import AIService
-from app.utils.file_utils import AudioHandler
+from app.utils.s3_storage import s3_storage
 from app.enums import VoiceStatus
 from typing import List, Optional, Dict, Any
 import os
@@ -49,11 +49,9 @@ class VoiceService:
             )
 
         try:
-            # Handle audio file upload
-            audio_handler = AudioHandler()
-            audio_metadata = await audio_handler.handle_upload(
-                file, referral_id, uploader_id
-            )
+            # Handle audio file upload to Cloud Storage
+            folder = f"referral_{referral_id}/voice_notes"
+            audio_metadata = await s3_storage.upload_file(file, folder)
 
             # Create voice note record
             voice_note = VoiceNote(

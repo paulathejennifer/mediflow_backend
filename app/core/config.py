@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
 
+    # S3 / Backblaze B2 Configuration
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    S3_BUCKET_NAME: str = "mediflow-clinical-data"
+    S3_ENDPOINT_URL: Optional[str] = None
+
     # AI Integration
     OPENAI_API_KEY: Optional[str] = None
     WHISPER_MODEL: str = "large-v3"

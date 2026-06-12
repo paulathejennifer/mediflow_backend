@@ -59,6 +59,7 @@ async def create_referral(
 def list_referrals(
     skip: int = Query(0),
     limit: int = Query(100),
+    patient_id: Optional[int] = Query(None),
     status: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -70,6 +71,8 @@ def list_referrals(
     )
     if current_user.role != UserRole.SUPER_ADMIN:
         query = query.filter((Referral.from_facility_id == current_user.facility_id) | (Referral.to_facility_id == current_user.facility_id))
+    if patient_id:
+        query = query.filter(Referral.patient_id == patient_id)
     if status:
         query = query.filter(Referral.status == status)
     return query.order_by(Referral.created_at.desc()).offset(skip).limit(limit).all()
