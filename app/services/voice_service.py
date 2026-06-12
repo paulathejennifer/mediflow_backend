@@ -454,9 +454,6 @@ class VoiceService:
 
                 # Trigger AI cleanup
                 self._trigger_transcript_cleanup(voice_note_id, transcript)
-        finally:
-            db.close()
-            
         except Exception as e:
             # Update status to failed
             voice_note = self.get_voice_note_by_id(voice_note_id)
@@ -464,6 +461,8 @@ class VoiceService:
                 voice_note.status = VoiceStatus.FAILED
                 self.db.commit()
             print(f"Transcription failed for voice note {voice_note_id}: {str(e)}")
+        finally:
+            db.close()
 
     def _transcribe_audio(self, voice_note: VoiceNote) -> str:
         """Transcribe audio file using Google Speech Recognition."""
