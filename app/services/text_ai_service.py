@@ -261,7 +261,7 @@ class TextAIService:
 
         for line in lines:
             line = line.strip()
-            if ":" in line and any(header in line.upper() for header in ["SUMMARY", "FINDINGS", "RISKS", "INFO", "STEPS", "LEVEL", "NOTE", "SCORE"]):
+            if ":" in line and any(header in line.upper() for header in ["SUMMARY", "FINDINGS", "RISKS", "INFO", "STEPS", "LEVEL", "NOTE", "SCORE", "TRANSCRIPTION"]):
                 # New section
                 current_section = line.split(":")[0].strip().upper()
                 content = line.split(":", 1)[1].strip()

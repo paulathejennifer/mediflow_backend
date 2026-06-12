@@ -52,9 +52,10 @@ async def transcribe_raw_audio(
                 "specialty": "General Medicine"
             })
             
+            polished_text = cleanup_result.get("cleaned_transcript", "")
             # Return the polished transcript
             return {
-                "transcript": cleanup_result.get("cleaned_transcript", raw_text),
+                "transcript": polished_text if polished_text and len(polished_text) > 0 else raw_text,
                 "raw_transcript": raw_text,
                 "corrections": cleanup_result.get("corrections", ""),
                 "processing_info": speech_result.get("processing_info", {})
