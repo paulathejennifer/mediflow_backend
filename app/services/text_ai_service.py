@@ -261,9 +261,18 @@ class TextAIService:
 
         for line in lines:
             line = line.strip()
-            if ":" in line and any(header in line.upper() for header in ["SUMMARY", "FINDINGS", "RISKS", "INFO", "STEPS", "LEVEL", "NOTE", "SCORE", "TRANSCRIPTION", "CORRECTIONS", "RECOMMENDATIONS"]):
+            # Strict header matching to avoid clashing with bolded text like **Referral Note:**
+            header_keywords = [
+                "CLEANED TRANSCRIPTION", "TERMINOLOGY CORRECTIONS", "SUMMARY", 
+                "KEY CLINICAL FINDINGS", "KEY RISKS", "MISSING CRITICAL INFORMATION", 
+                "RECOMMENDED NEXT STEPS", "UNCERTAINTY LEVEL", "DOCUMENT SUMMARY", 
+                "ABNORMAL RESULTS", "RECOMMENDATIONS", "COMPLETENESS SCORE"
+            ]
+            
+            if ":" in line and any(line.upper().startswith(h) or f"**{h}" in line.upper() for h in header_keywords):
                 # New section
                 current_section = line.split(":")[0].strip().upper()
+                current_section = current_section.replace("*", "").replace("#", "")
                 content = line.split(":", 1)[1].strip()
                 sections[current_section] = content
             elif current_section and line and line != sections.get(current_section):
