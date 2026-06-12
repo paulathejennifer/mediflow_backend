@@ -408,7 +408,8 @@ class DocumentService:
         from app.core.database import SessionLocal
         db = SessionLocal()
         try:
-            document = db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
+            # Use with_for_update to lock the row during processing
+            document = db.query(ReferralDocument).filter(ReferralDocument.id == document_id).with_for_update().first()
             if not document:
                 return
 
@@ -417,7 +418,7 @@ class DocumentService:
 
             if extracted_text:
                 document.extracted_text = extracted_text
-                document.ai_processed = True
+                document.ai_processed = "true" # Store as string
                 db.commit()
         except Exception as e:
             print(f"Text extraction failed for document {document_id}: {str(e)}")

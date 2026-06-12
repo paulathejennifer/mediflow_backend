@@ -435,12 +435,12 @@ class VoiceService:
         from app.core.database import SessionLocal
         db = SessionLocal()
         try:
-            voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).with_for_update().first()
+            voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).with_for_update().first() # Lock row
             if not voice_note:
                 return
 
             # Update status to processing
-            voice_note.status = VoiceStatus.PROCESSING
+            voice_note.status = VoiceStatus.PROCESSING.value # Use .value for string enum
             db.commit()
 
             # Perform transcription
@@ -449,16 +449,16 @@ class VoiceService:
             if transcript:
                 # Update with raw transcript
                 voice_note.transcript = transcript
-                voice_note.status = VoiceStatus.TRANSCRIBED
+                voice_note.status = VoiceStatus.TRANSCRIBED.value # Use .value for string enum
                 db.commit()
 
                 # Trigger AI cleanup
                 self._trigger_transcript_cleanup(voice_note_id, transcript)
         except Exception as e:
             # Create a clean session for the error handler if the previous one failed
-            voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).first()
+            voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).with_for_update().first() # Lock row for update
             if voice_note:
-                voice_note.status = VoiceStatus.FAILED
+                voice_note.status = VoiceStatus.FAILED.value # Use .value for string enum
                 db.commit()
             print(f"Transcription failed for voice note {voice_note_id}: {str(e)}")
         finally:
@@ -467,34 +467,11 @@ class VoiceService:
     def _transcribe_audio(self, voice_note: VoiceNote) -> str:
         """Transcribe audio file using Google Speech Recognition."""
         try:
-            # Initialize recognizer
-            recognizer = sr.Recognizer()
-
-            # Check if audio file exists
-            if not os.path.exists(voice_note.audio_path):
-                print(f"Audio file not found: {voice_note.audio_path}")
-                return ""
-
-            # Use the audio file
-            with sr.AudioFile(voice_note.audio_path) as source:
-                # Read the audio data
-                audio_data = recognizer.record(source)
-
-                # Recognize speech using Google's free web API
-                try:
-                    transcript = recognizer.recognize_google(audio_data)
-                    return transcript
-                except sr.UnknownValueError:
-                    print(
-                        f"Google Speech Recognition could not understand audio for {voice_note.audio_file_name}"
-                    )
-                    return ""
-                except sr.RequestError as e:
-                    print(
-                        f"Could not request results from Google Speech Recognition service; {e}"
-                    )
-                    return ""
-
+            # Delegate to speech_ai_service which handles S3 download and conversion
+            from app.services.speech_ai_service import speech_ai_service
+            # This is a synchronous call, so it will block the thread, but it's in a background thread
+            transcription_result = asyncio.run(speech_ai_service.transcribe_audio(voice_note.audio_path))
+            return transcription_result.get("transcript", "")
         except Exception as e:
             print(f"Error transcribing audio: {str(e)}")
             return ""
@@ -503,14 +480,16 @@ class VoiceService:
         self, voice_note_id: int, raw_transcript: str
     ) -> None:
         """Trigger AI cleanup of transcript (async)."""
+        from app.core.database import SessionLocal
+        db = SessionLocal()
         try:
-            voice_note = self.get_voice_note_by_id(voice_note_id)
+            voice_note = db.query(VoiceNote).filter(VoiceNote.id == voice_note_id).first()
             if not voice_note:
                 return
 
             # Get referral context
-            referral = (
-                self.db.query(Referral)
+            referral = ( # Use the new db session
+                db.query(Referral)
                 .filter(Referral.id == voice_note.referral_id)
                 .first()
             )

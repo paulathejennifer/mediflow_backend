@@ -654,7 +654,7 @@ class ReferralService:
             referral = db.query(Referral).filter(Referral.id == referral_id).first()
             if referral:
                 referral.ai_summary = summary_result.get("summary", "")
-                referral.ai_status = "completed"
+                referral.ai_status = "completed" # Ensure this is a string
                 db.commit()
 
 
