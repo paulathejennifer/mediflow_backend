@@ -9,14 +9,17 @@ import io
 
 class S3Storage:
     def __init__(self):
-        # Safely extract region from endpoint or fallback to default
-        endpoint = getattr(settings, "S3_ENDPOINT_URL", "") or ""
+        # Use settings or fallback to avoid NoneType errors during init
+        endpoint = str(getattr(settings, "S3_ENDPOINT_URL", "") or "")
         region = "us-east-005"
         
-        if endpoint and isinstance(endpoint, str) and '.' in endpoint:
+        if '.' in endpoint:
             parts = endpoint.split('.')
-            if len(parts) > 1:
-                region = parts[1]
+            # Handles cases like https://s3.us-east-005.backblazeb2.com
+            for part in parts:
+                if 'us-east' in part:
+                    region = part
+                    break
         
         self.s3 = boto3.client(
             's3',
