@@ -3,6 +3,7 @@ from botocore.config import Config
 from app.core.config import settings
 from fastapi import UploadFile
 import uuid
+import tempfile
 import os
 
 class S3Storage:
@@ -55,5 +56,20 @@ class S3Storage:
     def delete_file(self, file_key: str):
         """Deletes a file from the bucket."""
         self.s3.delete_object(Bucket=self.bucket, Key=file_key)
+
+    def download_to_temp_file(self, file_key: str) -> str:
+        """Downloads an S3 file to a local temporary path."""
+        file_extension = os.path.splitext(file_key)[1]
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_extension)
+        temp_path = temp_file.name
+        temp_file.close()
+
+        try:
+            self.s3.download_file(self.bucket, file_key, temp_path)
+            return temp_path
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise e
 
 s3_storage = S3Storage()

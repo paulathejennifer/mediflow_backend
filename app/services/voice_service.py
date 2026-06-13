@@ -58,10 +58,10 @@ class VoiceService:
             voice_note = VoiceNote(
                 referral_id=referral_id,
                 uploaded_by=uploader_id,
-                status=VoiceStatus.UPLOADED,
+                status=VoiceStatus.UPLOADED.value,
                 audio_path=meta["path"],
                 audio_file_name=meta["name"],
-                audio_file_size=meta["size"]
+                audio_file_size=meta["size"] or 0
             )
 
             self.db.add(voice_note)
