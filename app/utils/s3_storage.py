@@ -20,10 +20,14 @@ class S3Storage:
                 if 'us-east' in part:
                     region = part
                     break
+
+        # Ensure endpoint includes https:// protocol for boto3
+        if endpoint and not endpoint.startswith('http'):
+            endpoint = f"https://{endpoint}"
         
         self.s3 = boto3.client(
             's3',
-            endpoint_url=settings.S3_ENDPOINT_URL,
+            endpoint_url=endpoint,
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             region_name=region,
