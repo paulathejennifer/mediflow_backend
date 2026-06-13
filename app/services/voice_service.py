@@ -441,7 +441,7 @@ class VoiceService:
                 return
 
             # Update status to processing
-            voice_note.status = VoiceStatus.PROCESSING.value # Use .value for string enum
+            voice_note.status = "processing"
             db.commit()
 
             # Perform transcription

@@ -19,7 +19,7 @@ from app.schemas.referral import ReferralCreate, ReferralUpdate
 from app.services.ai_service import AIService
 from app.enums import ReferralStatus, Priority, UserRole
 from typing import List, Optional, Dict, Any, Union
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 
 
@@ -653,7 +653,7 @@ class ReferralService:
             # Update referral with AI summary
             referral = db.query(Referral).filter(Referral.id == referral_id).first()
             if referral:
-                referral.ai_summary = summary_result.get("summary", "")
+                referral.ai_summary = json.dumps(summary_result)
                 referral.ai_status = "completed"
                 db.commit()
 
