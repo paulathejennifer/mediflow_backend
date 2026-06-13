@@ -216,8 +216,8 @@ class ReferralService:
                 detail="Only users from receiver facility can accept referrals",
             )
 
-        referral.status = ReferralStatus.ACCEPTED
-        referral.submitted_at = datetime.now(timezone.utc)
+        referral.status = ReferralStatus.ACCEPTED.value
+        referral.accepted_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(referral)
 
@@ -257,7 +257,8 @@ class ReferralService:
                 detail="Only users from receiver facility can reject referrals",
             )
 
-        referral.status = ReferralStatus.REJECTED
+        referral.status = ReferralStatus.REJECTED.value
+        referral.rejected_at = datetime.now(timezone.utc)
         referral.notes = f"Rejected: {reason}"
         self.db.commit()
         self.db.refresh(referral)
@@ -529,24 +530,27 @@ class ReferralService:
                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
             )
 
+        # Normalize current_status to the enum class member if it's a string from DB
+        current_status_enum = next((s for s in ReferralStatus if s.value == current_status), current_status)
+
         # Define valid transitions
         valid_transitions = {
-            ReferralStatus.DRAFT: [ReferralStatus.SUBMITTED],
+            ReferralStatus.DRAFT: [ReferralStatus.SUBMITTED.value],
             ReferralStatus.SUBMITTED: [
-                ReferralStatus.ACCEPTED,
-                ReferralStatus.REJECTED,
+                ReferralStatus.ACCEPTED.value,
+                ReferralStatus.REJECTED.value,
             ],
             ReferralStatus.ACCEPTED: [
-                ReferralStatus.IN_TRANSIT,
-                ReferralStatus.REJECTED,
+                ReferralStatus.IN_TRANSIT.value,
+                ReferralStatus.REJECTED.value,
             ],
-            ReferralStatus.IN_TRANSIT: [ReferralStatus.RECEIVED],
-            ReferralStatus.RECEIVED: [ReferralStatus.COMPLETED],
+            ReferralStatus.IN_TRANSIT: [ReferralStatus.RECEIVED.value],
+            ReferralStatus.RECEIVED: [ReferralStatus.COMPLETED.value],
             ReferralStatus.REJECTED: [],  # Terminal state
             ReferralStatus.COMPLETED: [],  # Terminal state
         }
 
-        if new_status not in valid_transitions.get(current_status, []):
+        if new_status not in valid_transitions.get(current_status_enum, []):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid status transition from {current_status} to {new_status}",

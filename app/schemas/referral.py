@@ -88,7 +88,9 @@ class ReferralSummary(BaseModel):
     id: int
     patient_name: str
     from_facility_name: str
+    from_facility_id: int
     to_facility_name: str
+    to_facility_id: int
     status: str
     priority: str
     created_at: datetime
