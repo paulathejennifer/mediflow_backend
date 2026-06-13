@@ -9,8 +9,14 @@ import io
 
 class S3Storage:
     def __init__(self):
-        # Extract region from endpoint (e.g., us-east-005)
-        region = settings.S3_ENDPOINT_URL.split('.')[1] if '.' in settings.S3_ENDPOINT_URL else 'us-east-005'
+        # Safely extract region from endpoint or fallback to default
+        endpoint = getattr(settings, "S3_ENDPOINT_URL", "") or ""
+        region = "us-east-005"
+        
+        if endpoint and isinstance(endpoint, str) and '.' in endpoint:
+            parts = endpoint.split('.')
+            if len(parts) > 1:
+                region = parts[1]
         
         self.s3 = boto3.client(
             's3',
