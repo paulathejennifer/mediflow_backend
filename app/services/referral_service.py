@@ -87,7 +87,7 @@ class ReferralService:
             priority=referral_data.priority,
             reason_for_referral=referral_data.reason_for_referral,
             clinical_notes=referral_data.clinical_notes,
-            status=ReferralStatus.DRAFT,
+            status=ReferralStatus.DRAFT.value,
         )
 
         self.db.add(referral)
@@ -178,7 +178,7 @@ class ReferralService:
                 detail="Only users from sender facility can submit referrals",
             )
 
-        referral.status = ReferralStatus.SUBMITTED
+        referral.status = ReferralStatus.SUBMITTED.value
         referral.submitted_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(referral)

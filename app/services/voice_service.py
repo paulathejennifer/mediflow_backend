@@ -17,6 +17,7 @@ from app.services.ai_service import AIService
 from app.utils.s3_storage import s3_storage
 from app.enums import VoiceStatus
 from typing import List, Optional, Dict, Any
+import asyncio
 import os
 import speech_recognition as sr
 
