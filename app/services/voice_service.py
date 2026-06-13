@@ -510,6 +510,8 @@ class VoiceService:
 
         except Exception as e:
             print(f"Transcript cleanup failed for voice note {voice_note_id}: {str(e)}")
+        finally:
+            db.close()
 
     async def _run_async_cleanup(self, voice_note_id: int, context: Dict[str, Any]) -> None:
         """Background task for transcript cleanup with its own session."""
