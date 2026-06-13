@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -16,7 +16,7 @@ class ReferralDocument(Base):
     file_size = Column(Integer, nullable=False)
     mime_type = Column(String, nullable=False)
     extracted_text = Column(Text, nullable=True)
-    ai_processed = Column(String, default="false")
+    ai_processed = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

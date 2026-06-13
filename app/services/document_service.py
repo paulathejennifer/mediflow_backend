@@ -418,7 +418,7 @@ class DocumentService:
 
             if extracted_text:
                 document.extracted_text = extracted_text
-                document.ai_processed = "true" # Store as string
+                document.ai_processed = True
                 db.commit()
         except Exception as e:
             print(f"Text extraction failed for document {document_id}: {str(e)}")

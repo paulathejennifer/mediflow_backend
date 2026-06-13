@@ -5,14 +5,19 @@ from fastapi import UploadFile
 import uuid
 import tempfile
 import os
+import io
 
 class S3Storage:
     def __init__(self):
+        # Extract region from endpoint (e.g., us-east-005)
+        region = settings.S3_ENDPOINT_URL.split('.')[1] if '.' in settings.S3_ENDPOINT_URL else 'us-east-005'
+        
         self.s3 = boto3.client(
             's3',
             endpoint_url=settings.S3_ENDPOINT_URL,
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=region,
             config=Config(signature_version='s3v4')
         )
         self.bucket = settings.S3_BUCKET_NAME
@@ -30,7 +35,7 @@ class S3Storage:
         
         # Upload the file
         self.s3.upload_fileobj(
-            file.file,
+            io.BytesIO(content),
             self.bucket,
             file_key,
             ExtraArgs={
