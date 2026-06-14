@@ -18,7 +18,7 @@ from app.models.facility import Facility
 from app.models.user import User
 from app.enums import UserRole, AuditAction, ReferralStatus, Priority
 from app.services.notification_service import get_notification_service
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 # redirect_slashes=True handles the /accept vs /accept/ issue automatically
 router = APIRouter(redirect_slashes=True)
