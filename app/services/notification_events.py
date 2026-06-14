@@ -270,6 +270,7 @@ class NotificationEventCreators:
                 "referral_id": referral.id,
             },
             actions=["Accept", "Reject", "Call Clinic", "View Patient", "Schedule Appointment"],
+            facility_id=referral.to_facility_id,
             roles=["facility_admin", "clinician"],
             backend_source="referrals",
             trigger_condition=f"referral.status === 'submitted' && referral.id === {referral.id}",

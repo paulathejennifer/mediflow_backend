@@ -37,7 +37,7 @@ async def list_notifications(
         user_id=current_user.id,
         user_role=current_user.role,
         notification_type=notification_type,
-        unread_only=not is_read if is_read is not None else False,
+        unread_only=unread_only,
         limit=limit,
         facility_id=current_user.facility_id
     )

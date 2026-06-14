@@ -254,6 +254,7 @@ class NotificationService(NotificationEventCreators):
             roles=roles,
             backend_source="referrals",
             trigger_condition=f"referral.priority === 'emergency' && referral.id === {referral.id}",
+            facility_id=referral.to_facility_id,
         )
 
         return notification
@@ -427,6 +428,7 @@ class NotificationService(NotificationEventCreators):
             roles=roles,
             backend_source="referrals",
             trigger_condition=f"referral.status === '{referral.status}'",
+            facility_id=referral.from_facility_id,
         )
 
         return notification

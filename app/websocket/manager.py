@@ -157,6 +157,21 @@ class ConnectionManager:
         )
         return total_sent, total_failed
 
+    async def broadcast_to_facility_roles(self, facility_id: int, roles: List[str], notification: dict):
+        """Broadcast to specific roles within a specific facility"""
+        success_count = 0
+        failed_count = 0
+        
+        if facility_id in self.facility_connections:
+            for user_id in self.facility_connections[facility_id][:]:
+                conn_info = self.active_connections.get(user_id)
+                if conn_info and conn_info["role"] in roles:
+                    if await self.send_to_user(user_id, notification):
+                        success_count += 1
+                    else:
+                        failed_count += 1
+        return success_count, failed_count
+
     async def broadcast_to_facility(self, facility_id: int, notification: dict):
         """Broadcast notification to all users in specific facility"""
         if facility_id in self.facility_connections:
@@ -312,21 +327,24 @@ class NotificationBroadcaster:
             if "shared" in target_roles:
                 target_roles = ["facility_admin", "clinician"]
 
-            # Broadcast to target roles
-            total_sent, total_failed = await self.connection_manager.broadcast_to_roles(
-                target_roles, notification_data
-            )
+            total_sent = 0
+            total_failed = 0
 
-            # If notification is facility-specific, also broadcast to facility users
-            if hasattr(notification, "facility_id") and notification.facility_id:
-                (
-                    facility_sent,
-                    facility_failed,
-                ) = await self.connection_manager.broadcast_to_facility(
-                    notification.facility_id, notification_data
+            if notification.user_id:
+                # Direct user notification
+                is_sent = await self.connection_manager.send_to_user(str(notification.user_id), notification_data)
+                total_sent = 1 if is_sent else 0
+                total_failed = 0 if is_sent else 1
+            elif notification.facility_id:
+                # Facility-scoped notification: Send ONLY to matching roles within that facility
+                total_sent, total_failed = await self.connection_manager.broadcast_to_facility_roles(
+                    notification.facility_id, target_roles, notification_data
                 )
-                total_sent += facility_sent
-                total_failed += facility_failed
+            else:
+                # Global notification: Send to matching roles across all facilities
+                total_sent, total_failed = await self.connection_manager.broadcast_to_roles(
+                    target_roles, notification_data
+                )
 
             # Record delivery attempts
             await self.record_delivery_attempts(
@@ -394,6 +412,10 @@ async def authenticate_websocket(token: str, db: Session) -> Optional[User]:
     """Authenticate WebSocket connection using JWT token"""
     try:
         payload = verify_token(token)
+        if payload is None:
+            logger.warning("WebSocket auth failed: Token payload is None")
+            return None
+
         user_id = payload.get("sub")
 
         if not user_id:
