@@ -15,6 +15,21 @@ class UserLogin(BaseModel):
     _normalize_email = validator("email", pre=True, allow_reuse=True)(normalize_email)
 
 
+class UserResponse(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+    phone: Optional[str] = None
+    gender: Optional[str] = None
+    role: str
+    facility_id: Optional[int] = None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
 class Token(BaseModel):
     access_token: str
     refresh_token: str
@@ -37,21 +52,6 @@ class UserCreate(BaseModel):
     facility_id: Optional[int] = None
 
     _normalize_email = validator("email", pre=True, allow_reuse=True)(normalize_email)
-
-
-class UserResponse(BaseModel):
-    id: int
-    first_name: str
-    last_name: str
-    email: str
-    phone: Optional[str] = None
-    gender: Optional[str] = None
-    role: str
-    facility_id: Optional[int] = None
-    is_active: bool
-
-    class Config:
-        from_attributes = True
 
 
 class PasswordChange(BaseModel):
