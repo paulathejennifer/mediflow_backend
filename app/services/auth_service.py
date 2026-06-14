@@ -134,6 +134,7 @@ class AuthService:
             "access_token": access_token,
             "refresh_token": refresh_token_jwt,
             "token_type": "bearer",
+            "user": UserResponse.from_orm(user)
         }
 
     def refresh_access_token(self, refresh_token_jwt: str) -> dict:

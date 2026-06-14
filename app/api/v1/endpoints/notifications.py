@@ -23,7 +23,7 @@ router = APIRouter()
 @router.get("/", response_model=List[Dict[str, Any]])
 async def list_notifications(
     notification_type: Optional[str] = None,
-    is_read: Optional[bool] = Query(None, alias="unread_only"),
+    unread_only: bool = Query(False),
     limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
