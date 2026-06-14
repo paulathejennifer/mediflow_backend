@@ -69,8 +69,19 @@ def list_referrals(
         joinedload(Referral.from_facility),
         joinedload(Referral.to_facility)
     )
-    if current_user.role != UserRole.SUPER_ADMIN:
-        query = query.filter((Referral.from_facility_id == current_user.facility_id) | (Referral.to_facility_id == current_user.facility_id))
+    
+    # Strict facility-based multi-tenancy filtering
+    if current_user.role != UserRole.SUPER_ADMIN.value:
+        if not current_user.facility_id:
+             # If a non-admin has no facility, they see nothing (safety first)
+             return []
+        query = query.filter(
+            or_(
+                Referral.from_facility_id == current_user.facility_id,
+                Referral.to_facility_id == current_user.facility_id
+            )
+        )
+
     if patient_id:
         query = query.filter(Referral.patient_id == patient_id)
     if status:
