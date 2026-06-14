@@ -13,7 +13,7 @@ from app.models.patient import Patient
 from app.models.referral_document import ReferralDocument
 from app.models.notifications import Notification
 from app.enums import UserRole, ReferralStatus, Priority
-from sqlalchemy import and_, or_, func, extract, case, cast, Text
+from sqlalchemy import and_, or_, func, extract, case, cast, Text, select
 from sqlalchemy.sql import label
 from app.services.analytics_service import get_analytics_service
 
@@ -417,19 +417,19 @@ def get_dashboard_kpis(
             referral_trend = calculate_trend(total_referrals, total_referrals_prev)
             
             # Document stats for facility
-            referral_ids = db.query(Referral.id).filter(
+            referral_ids_subquery = select(Referral.id).filter(
                 or_(Referral.from_facility_id == facility_id, Referral.to_facility_id == facility_id)
-            ).subquery()
+            )
             
             total_documents = db.query(ReferralDocument).filter(
-                ReferralDocument.referral_id.in_(referral_ids)
+                ReferralDocument.referral_id.in_(referral_ids_subquery)
             ).count()
             new_docs_current = db.query(ReferralDocument).filter(
-                and_(ReferralDocument.referral_id.in_(referral_ids), ReferralDocument.created_at >= start_date)
+                and_(ReferralDocument.referral_id.in_(referral_ids_subquery), ReferralDocument.created_at >= start_date)
             ).count()
             new_docs_prev = db.query(ReferralDocument).filter(
                 and_(
-                    ReferralDocument.referral_id.in_(referral_ids),
+                    ReferralDocument.referral_id.in_(referral_ids_subquery),
                     ReferralDocument.created_at >= prev_start_date,
                     ReferralDocument.created_at < start_date
                 )

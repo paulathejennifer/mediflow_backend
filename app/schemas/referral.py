@@ -74,6 +74,7 @@ class DocumentDetail(BaseModel):
     id: int
     file_name: str
     file_type: str
+    file_size: int
     model_config = ConfigDict(from_attributes=True)
 
 
