@@ -47,70 +47,91 @@ def upgrade() -> None:
         batch_op.drop_index('ix_notification_deliveries_user_id')
         batch_op.create_index(batch_op.f('ix_notification_deliveries_id'), ['id'], unique=False)
 
+    notif_pref_cols = [c['name'] for c in inspector.get_columns('notification_preferences')]
     with op.batch_alter_table('notification_preferences', schema=None) as batch_op:
-        batch_op.alter_column('enabled',
-               existing_type=sa.BOOLEAN(),
-               nullable=True,
-               existing_server_default=sa.text("'1'"))
-        batch_op.alter_column('delivery_methods',
-               existing_type=sqlite.JSON(),
-               nullable=True,
-               existing_server_default=sa.text('\'["websocket"]\''))
-        batch_op.drop_index('ix_notification_preferences_user_id')
+        if 'enabled' in notif_pref_cols:
+            batch_op.alter_column('enabled',
+                   existing_type=sa.BOOLEAN(),
+                   nullable=True,
+                   existing_server_default=sa.text("'1'"))
+        else:
+            batch_op.add_column(sa.Column('enabled', sa.Boolean(), nullable=True, server_default=sa.text('true')))
+
+        if 'delivery_methods' in notif_pref_cols:
+            batch_op.alter_column('delivery_methods',
+                   existing_type=sqlite.JSON(),
+                   nullable=True,
+                   existing_server_default=sa.text('\'["websocket"]\''))
+        else:
+            batch_op.add_column(sa.Column('delivery_methods', sqlite.JSON(), nullable=True))
+
+        pref_indexes = [i['name'] for i in inspector.get_indexes('notification_preferences')]
+        if 'ix_notification_preferences_user_id' in pref_indexes:
+            batch_op.drop_index('ix_notification_preferences_user_id')
         batch_op.create_index(batch_op.f('ix_notification_preferences_id'), ['id'], unique=False)
 
-    with op.batch_alter_table('notification_queue', schema=None) as batch_op:
-        batch_op.alter_column('status',
-               existing_type=sa.VARCHAR(length=255),
-               nullable=True,
-               existing_server_default=sa.text("'pending'"))
-        batch_op.alter_column('attempts',
-               existing_type=sa.INTEGER(),
-               nullable=True,
-               existing_server_default=sa.text("'0'"))
-        batch_op.drop_index('ix_notification_queue_notification_id')
-        batch_op.drop_index('ix_notification_queue_user_id')
-        batch_op.create_index(batch_op.f('ix_notification_queue_id'), ['id'], unique=False)
+    if 'notification_queue' in inspector.get_table_names():
+        with op.batch_alter_table('notification_queue', schema=None) as batch_op:
+            batch_op.alter_column('status',
+                   existing_type=sa.VARCHAR(length=255),
+                   nullable=True,
+                   existing_server_default=sa.text("'pending'"))
+            batch_op.alter_column('attempts',
+                   existing_type=sa.INTEGER(),
+                   nullable=True,
+                   existing_server_default=sa.text("'0'"))
+            batch_op.create_index(batch_op.f('ix_notification_queue_id'), ['id'], unique=False)
+            # Only drop if they actually exist
+            queue_indexes = [i['name'] for i in inspector.get_indexes('notification_queue')]
+            if 'ix_notification_queue_notification_id' in queue_indexes:
+                batch_op.drop_index('ix_notification_queue_notification_id')
+            if 'ix_notification_queue_user_id' in queue_indexes:
+                batch_op.drop_index('ix_notification_queue_user_id')
 
-    with op.batch_alter_table('notification_templates', schema=None) as batch_op:
-        batch_op.alter_column('default_roles',
-               existing_type=sqlite.JSON(),
-               nullable=True,
-               existing_server_default=sa.text("'[]'"))
-        batch_op.alter_column('backend_source',
-               existing_type=sa.VARCHAR(length=255),
-               nullable=True,
-               existing_server_default=sa.text("'system'"))
-        batch_op.alter_column('is_active',
-               existing_type=sa.BOOLEAN(),
-               nullable=True,
-               existing_server_default=sa.text('(true)'))
-        batch_op.create_index(batch_op.f('ix_notification_templates_id'), ['id'], unique=False)
+    if 'notification_templates' in inspector.get_table_names():
+        with op.batch_alter_table('notification_templates', schema=None) as batch_op:
+            batch_op.alter_column('default_roles',
+                   existing_type=sqlite.JSON(),
+                   nullable=True,
+                   existing_server_default=sa.text("'[]'"))
+            batch_op.alter_column('backend_source',
+                   existing_type=sa.VARCHAR(length=255),
+                   nullable=True,
+                   existing_server_default=sa.text("'system'"))
+            batch_op.alter_column('is_active',
+                   existing_type=sa.BOOLEAN(),
+                   nullable=True,
+                   existing_server_default=sa.text('(true)'))
+            batch_op.create_index(batch_op.f('ix_notification_templates_id'), ['id'], unique=False)
 
-    with op.batch_alter_table('notifications', schema=None) as batch_op:
-        batch_op.alter_column('details',
-               existing_type=sqlite.JSON(),
-               nullable=True,
-               existing_server_default=sa.text("'{}'"))
-        batch_op.alter_column('actions',
-               existing_type=sqlite.JSON(),
-               nullable=True,
-               existing_server_default=sa.text("'[]'"))
-        batch_op.alter_column('roles',
-               existing_type=sqlite.JSON(),
-               nullable=True,
-               existing_server_default=sa.text("'[]'"))
-        batch_op.alter_column('backend_source',
-               existing_type=sa.VARCHAR(length=255),
-               nullable=True,
-               existing_server_default=sa.text("'system'"))
-        batch_op.alter_column('is_read',
-               existing_type=sa.BOOLEAN(),
-               nullable=True,
-               existing_server_default=sa.text("'0'"))
-        batch_op.drop_index('ix_notifications_notification_type')
-        batch_op.drop_index('ix_notifications_user_id')
-        batch_op.create_index(batch_op.f('ix_notifications_id'), ['id'], unique=False)
+    if 'notifications' in inspector.get_table_names():
+        with op.batch_alter_table('notifications', schema=None) as batch_op:
+            batch_op.alter_column('details',
+                   existing_type=sqlite.JSON(),
+                   nullable=True,
+                   existing_server_default=sa.text("'{}'"))
+            batch_op.alter_column('actions',
+                   existing_type=sqlite.JSON(),
+                   nullable=True,
+                   existing_server_default=sa.text("'[]'"))
+            batch_op.alter_column('roles',
+                   existing_type=sqlite.JSON(),
+                   nullable=True,
+                   existing_server_default=sa.text("'[]'"))
+            batch_op.alter_column('backend_source',
+                   existing_type=sa.VARCHAR(length=255),
+                   nullable=True,
+                   existing_server_default=sa.text("'system'"))
+            batch_op.alter_column('is_read',
+                   existing_type=sa.BOOLEAN(),
+                   nullable=True,
+                   existing_server_default=sa.text("'0'"))
+            batch_op.create_index(batch_op.f('ix_notifications_id'), ['id'], unique=False)
+            notif_indexes = [i['name'] for i in inspector.get_indexes('notifications')]
+            if 'ix_notifications_notification_type' in notif_indexes:
+                batch_op.drop_index('ix_notifications_notification_type')
+            if 'ix_notifications_user_id' in notif_indexes:
+                batch_op.drop_index('ix_notifications_user_id')
 
     with op.batch_alter_table('patient_identifiers', schema=None) as batch_op:
         batch_op.drop_index('ix_patient_identifiers_facility_id')
