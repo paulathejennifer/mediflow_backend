@@ -325,6 +325,7 @@ class NotificationEventCreators:
                 "next_steps": ["Contact Facility", "Try Alternative", "Escalate"],
             },
             actions=["Contact Facility", "Try Alternative", "Escalate"],
+            facility_id=referral.from_facility_id, # Notify the referring facility
             roles=["facility_admin", "clinician"],
             backend_source="referrals",
             expires_at=datetime.now(timezone.utc) + timedelta(days=7),
