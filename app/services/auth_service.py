@@ -5,7 +5,7 @@ import logging
 from fastapi import HTTPException, status, Depends
 from app.models.user import User
 from app.models.refresh_token import RefreshToken
-from app.schemas.auth import UserCreate, UserLogin
+from app.schemas.auth import UserCreate, UserLogin, UserResponse
 from app.core.security import (
     verify_password,
     get_password_hash,

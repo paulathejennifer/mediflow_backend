@@ -29,8 +29,12 @@ def upgrade() -> None:
     with op.batch_alter_table('facility_counters', schema=None) as batch_op:
         batch_op.drop_index('ix_facility_counters_facility_id')
 
-    with op.batch_alter_table('notification_deliveries', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('read_at', sa.DateTime(timezone=True), nullable=True))
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    notif_deliv_cols = [c['name'] for c in inspector.get_columns('notification_deliveries')]
+    if 'read_at' not in notif_deliv_cols:
+        with op.batch_alter_table('notification_deliveries', schema=None) as batch_op:
+            batch_op.add_column(sa.Column('read_at', sa.DateTime(timezone=True), nullable=True))
         batch_op.alter_column('delivery_method',
                existing_type=sa.VARCHAR(length=255),
                nullable=True,
