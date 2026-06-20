@@ -16,7 +16,6 @@ from app.enums import UserRole, ReferralStatus, Priority
 from sqlalchemy import and_, or_, func, extract, case, cast, Text, select
 from sqlalchemy.sql import label
 from app.services.analytics_service import get_analytics_service
-from app.api import get_db
 from app.services.analytics_llm_service import AnalyticsLLMService
 from app.services.dashboard_service import DashboardService
 from app.services.referral_intelligence_service import ReferralIntelligenceService
