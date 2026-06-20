@@ -19,6 +19,7 @@ from app.services.analytics_service import get_analytics_service
 from app.services.analytics_llm_service import AnalyticsLLMService
 from app.services.dashboard_service import DashboardService
 from app.services.referral_intelligence_service import ReferralIntelligenceService
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
