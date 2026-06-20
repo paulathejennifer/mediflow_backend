@@ -10,11 +10,10 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '008_add_updated_at_to_patient_identifiers'
+revision = '008_patient_id_updated_at' 
 down_revision = '007_add_facility_counters'
 branch_labels = None
 depends_on = None
-
 
 def upgrade():
     # Use batch mode for SQLite
