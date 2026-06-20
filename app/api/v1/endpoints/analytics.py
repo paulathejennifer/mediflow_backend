@@ -1393,19 +1393,29 @@ def get_analytics_metrics(
         )
 
 
+# Pydantic Request Model
+class AskAIRequest(BaseModel):
+    user_question: str
 
-@router.post("/ask")
+
+@router.post("/analytics/ask")
 async def ask_analytics_question(
-    payload: dict = Body(..., example={"question": "Which facilities received the most urgent referrals this month?"}),
+    payload: AskAIRequest,
     db: Session = Depends(get_db)
 ):
-    """Natural-language question interface that translates prompt text to secure, read-only SQL execution blocks."""
-    question = payload.get("question")
-    if not question:
-        raise HTTPException(status_code=400, detail="Missing question text inside query parameter container")
+    """
+    Natural-language question interface that translates prompt text 
+    to secure, read-only SQL execution blocks.
+    """
+    if not payload.user_question or not payload.user_question.strip():
+        raise HTTPException(
+            status_code=400, 
+            detail="Missing or empty question text"
+        )
         
     service = AnalyticsLLMService(db)
-    response = await service.execute_natural_query(question)
+    response = await service.execute_natural_query(payload.user_question)
+    
     return response
 
 @router.get("/dashboard/kpis")
