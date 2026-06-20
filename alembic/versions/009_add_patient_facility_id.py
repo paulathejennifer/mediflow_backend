@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '009_add_patient_facility_id'
-down_revision = '008_add_updated_at_to_patient_identifiers'
+down_revision = '008_patient_id_updated_at'
 branch_labels = None
 depends_on = None
 
