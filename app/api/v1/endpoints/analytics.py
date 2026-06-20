@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
@@ -16,6 +16,10 @@ from app.enums import UserRole, ReferralStatus, Priority
 from sqlalchemy import and_, or_, func, extract, case, cast, Text, select
 from sqlalchemy.sql import label
 from app.services.analytics_service import get_analytics_service
+from app.api import get_db
+from app.services.analytics_llm_service import AnalyticsLLMService
+from app.services.dashboard_service import DashboardService
+from app.services.referral_intelligence_service import ReferralIntelligenceService
 
 logger = logging.getLogger(__name__)
 
@@ -1388,3 +1392,35 @@ def get_analytics_metrics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving analytics metrics"
         )
+
+
+
+@router.post("/ask")
+async def ask_analytics_question(
+    payload: dict = Body(..., example={"question": "Which facilities received the most urgent referrals this month?"}),
+    db: Session = Depends(get_db)
+):
+    """Natural-language question interface that translates prompt text to secure, read-only SQL execution blocks."""
+    question = payload.get("question")
+    if not question:
+        raise HTTPException(status_code=400, detail="Missing question text inside query parameter container")
+        
+    service = AnalyticsLLMService(db)
+    response = await service.execute_natural_query(question)
+    return response
+
+@router.get("/dashboard/kpis")
+def get_dashboard_data(db: Session = Depends(get_db)):
+    """Retrieves standardized structural KPI summaries and item weights for frontend UI tracking components."""
+    service = DashboardService(db)
+    return service.get_kpi_dashboard_metrics()
+
+@router.post("/referrals/{referral_id}/intelligence")
+async def run_referral_ai_enrichment(referral_id: int, db: Session = Depends(get_db)):
+    """Extracts, categorizes, and logs intelligence analytics mapping from unstructured referral inputs."""
+    service = ReferralIntelligenceService(db)
+    try:
+        analysis = await service.analyze_referral(referral_id)
+        return {"status": "success", "referral_id": referral_id, "ai_intelligence": analysis}
+    except ValueError as val_err:
+        raise HTTPException(status_code=404, detail=str(val_err))

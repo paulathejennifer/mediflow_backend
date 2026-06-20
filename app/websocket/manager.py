@@ -407,7 +407,6 @@ class NotificationBroadcaster:
 connection_manager = ConnectionManager()
 notification_broadcaster = NotificationBroadcaster(connection_manager)
 
-
 async def authenticate_websocket(token: str, db: Session) -> Optional[User]:
     """Authenticate WebSocket connection using JWT token"""
     try:

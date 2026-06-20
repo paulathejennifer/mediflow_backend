@@ -10,8 +10,11 @@ from app.api.v1.endpoints import (
     ai,
     analytics,
     notifications,
+    duplicates,
+    analytics,
 )
 from app.api.v1 import websocket
+
 
 api_router = APIRouter()
 
@@ -30,3 +33,6 @@ api_router.include_router(websocket.router, prefix="/websocket", tags=["websocke
 api_router.include_router(
     notifications.router, prefix="/notifications", tags=["notifications"]
 )
+# Include v2 enhancements within the standard ecosystem mapping
+api_router.include_router(duplicates.router, prefix="/duplicates", tags=["V2 - Patient Deduplication"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["V2 - Analytics & AI Intelligence"])
