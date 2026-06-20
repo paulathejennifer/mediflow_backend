@@ -7,7 +7,7 @@ Create Date: 2024-01-15 23:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy.engine import reflection
 
 # revision identifiers, used by Alembic.
 revision = '005_add_updated_at_columns'
@@ -17,12 +17,36 @@ depends_on = None
 
 
 def upgrade():
-    # Add missing updated_at columns
-    op.add_column('referral_documents', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
-    op.add_column('voice_notes', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
+    # Get a database connection and inspect existing columns dynamically
+    bind = op.get_bind()
+    inspect_obj = reflection.Inspector.from_engine(bind)
+    
+    # 1. Safe addition for 'referral_documents' table
+    ref_doc_columns = [c['name'] for c in inspect_obj.get_columns('referral_documents')]
+    if 'updated_at' not in ref_doc_columns:
+        op.add_column('referral_documents', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
+    else:
+        print("Column 'updated_at' already exists in 'referral_documents'. Skipping.")
+
+    # 2. Safe addition for 'voice_notes' table
+    voice_note_columns = [c['name'] for c in inspect_obj.get_columns('voice_notes')]
+    if 'updated_at' not in voice_note_columns:
+        op.add_column('voice_notes', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
+    else:
+        print("Column 'updated_at' already exists in 'voice_notes'. Skipping.")
 
 
 def downgrade():
-    # Remove updated_at columns
-    op.drop_column('voice_notes', 'updated_at')
-    op.drop_column('referral_documents', 'updated_at')
+    # Get a database connection and inspect existing columns before dropping
+    bind = op.get_bind()
+    inspect_obj = reflection.Inspector.from_engine(bind)
+    
+    # Safe fallback for voice_notes downgrade
+    voice_note_columns = [c['name'] for c in inspect_obj.get_columns('voice_notes')]
+    if 'updated_at' in voice_note_columns:
+        op.drop_column('voice_notes', 'updated_at')
+
+    # Safe fallback for referral_documents downgrade
+    ref_doc_columns = [c['name'] for c in inspect_obj.get_columns('referral_documents')]
+    if 'updated_at' in ref_doc_columns:
+        op.drop_column('referral_documents', 'updated_at')

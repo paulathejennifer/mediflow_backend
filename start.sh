@@ -2,16 +2,19 @@
 set -e
 
 echo "========================================="
-echo "  MediFlow Backend - Starting Server"
+echo "   MediFlow Backend - Starting Server"
 echo "========================================="
 
 # Wait for database to be ready
 echo "Waiting for database..."
-for i in {1..15}; do
+for i in {1..30}; do
     python -c "
 from sqlalchemy import create_engine, text
 import os
-engine = create_engine(os.getenv('DATABASE_URL'))
+db_url = os.getenv('DATABASE_URL', '')
+if db_url.startswith('postgres://'):
+    db_url = db_url.replace('postgres://', 'postgresql://', 1)
+engine = create_engine(db_url)
 with engine.connect() as conn:
     conn.execute(text('SELECT 1'))
 " 2>/dev/null && break
@@ -19,10 +22,26 @@ with engine.connect() as conn:
     sleep 1
 done
 
+# Run database migrations FIRST
+echo "Running database migrations..."
+if alembic upgrade head; then
+    echo "Migrations complete."
+else
+    echo "WARNING: Alembic migrations failed. Attempting fallback schema creation."
+    python - <<'PY'
+import os
+from app.core.database import Base, engine
+print('Creating missing tables via SQLAlchemy metadata...')
+# This will safely build everything if Alembic crapped out
+Base.metadata.create_all(bind=engine)
+print('Fallback schema creation complete.')
+PY
+    echo "WARNING: Migrations failed, but fallback create_all was executed."
+    echo "  Fix your Alembic migration chain to apply schema changes properly."
+fi
 
-
-# Manual Schema Sync (Fix for missing columns on Free Render Tier)
-echo "Ensuring database schema is synchronized..."
+# Manual Schema Sync (Safe adjustment after tables are created)
+echo "Ensuring database schema column modifications match..."
 python - <<'PY'
 import os
 from sqlalchemy import create_engine, text
@@ -32,35 +51,23 @@ try:
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     engine = create_engine(database_url)
     with engine.connect() as conn:
-        print("Running manual column synchronization for 'referrals' table...")
-        # Fix for missing columns introduced in the notifications/tracking update
-        conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS accepted_by INTEGER"))
-        conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS rejected_by INTEGER"))
-        conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS completed_by INTEGER"))
-        conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE"))
-        conn.commit()
-        print("Manual column synchronization complete.")
+        print("Running manual column synchronization adjustments...")
+        
+        # Check if referrals table exists before attempting alter commands
+        table_check = conn.execute(text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'referrals')")).scalar()
+        
+        if table_check:
+            conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS accepted_by INTEGER"))
+            conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS rejected_by INTEGER"))
+            conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS completed_by INTEGER"))
+            conn.execute(text("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE"))
+            conn.commit()
+            print("Manual column synchronization complete.")
+        else:
+            print("Skipping column adjustments: 'referrals' table does not exist yet.")
 except Exception as e:
     print(f"Warning: Manual schema sync failed: {e}")
 PY
-
-# Run database migrations
-echo "Running database migrations..."
-
-if alembic upgrade head; then
-
-    echo "Migrations complete."
-else
-    echo "WARNING: Alembic migrations failed. Attempting fallback schema creation."
-    python - <<'PY'
-from app.core.database import Base, engine
-print('Creating missing tables via SQLAlchemy metadata...')
-Base.metadata.create_all(bind=engine)
-print('Fallback schema creation complete.')
-PY
-    echo "WARNING: Migrations failed, but fallback create_all was attempted."
-    echo "  Fix your Alembic migration chain to apply schema changes properly."
-fi
 
 # Create upload directory if it doesn't exist
 mkdir -p "${UPLOAD_DIR:-uploads}"
