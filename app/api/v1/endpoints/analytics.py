@@ -1399,7 +1399,7 @@ class AskAIRequest(BaseModel):
     user_question: str
 
 
-@router.post("/analytics/ask")
+@router.post("/ask")
 async def ask_analytics_question(
     payload: AskAIRequest,
     db: Session = Depends(get_db)
