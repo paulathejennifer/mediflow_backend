@@ -1458,16 +1458,28 @@ async def run_referral_ai_enrichment(referral_id: int, db: Session = Depends(get
 
 @router.get("/referrals/by-specialty")
 def get_referrals_by_specialty(db: Session = Depends(get_db)):
-    """Return referrals grouped by AI-extracted specialty."""
-    # Example query (adjust based on how you store specialty in ai_summary)
-    result = db.query(
-        func.json_extract(Referral.ai_summary, '$.v2_intelligence.specialty').label('specialty'),
-        func.count(Referral.id).label('count')
-    ).filter(
-        Referral.ai_summary.isnot(None)
-    ).group_by('specialty').all()
+    """Return referrals grouped by AI-extracted medical specialty (PostgreSQL compatible)."""
+    try:
+        result = db.execute(
+            text("""
+                SELECT 
+                    COALESCE(
+                        (ai_summary->'v2_intelligence'->>'specialty')::text, 
+                        'Unclassified'
+                    ) as specialty,
+                    COUNT(id) as count
+                FROM referrals 
+                WHERE ai_summary IS NOT NULL 
+                GROUP BY specialty
+                ORDER BY count DESC
+            """)
+        ).all()
 
-    labels = [r.specialty or "Unclassified" for r in result]
-    counts = [r.count for r in result]
+        labels = [row.specialty for row in result]
+        counts = [row.count for row in result]
 
-    return {"labels": labels, "data": counts}
+        return {"labels": labels, "data": counts}
+
+    except Exception as e:
+        logger.error(f"Error in referrals by specialty: {str(e)}")
+        return {"labels": [], "data": []}
