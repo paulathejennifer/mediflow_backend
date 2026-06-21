@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '011_add_notification_tables'
-down_revision = '010_change_users_is_active_to_boolean'
+down_revision = '010_users_is_active_bool'
 branch_labels = None
 depends_on = None
 

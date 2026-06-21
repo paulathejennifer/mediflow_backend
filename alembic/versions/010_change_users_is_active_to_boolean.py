@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '010_change_users_is_active_to_boolean'
+revision = '010_users_is_active_bool' 
 down_revision = '009_add_patient_facility_id'
 branch_labels = None
 depends_on = None
