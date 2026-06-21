@@ -80,7 +80,7 @@ class AnalyticsLLMService:
             SQL Execution Results: {data_payload}
             
             Summarize the raw database analytical result sets provided above to answer the user's question clearly.
-            Provide a short, direct summary titled "**Summary:**", followed by a section titled "**Key Items to Pay Attention To:**", containing analytical observations as bullet points.
+            Provide a short, direct summary titled "**Suary:**", followed by a section titled "**Key Items to Pay Attention To:**", containing analytical observations as bullet points.
             """
 
             summary_response = self.client.chat.completions.create(
