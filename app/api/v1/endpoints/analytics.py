@@ -25,6 +25,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+class AskAIRequest(BaseModel):
+    user_question: str
+
+
+def sanitize_ai_text(data: Any) -> Any:
+    """
+    Recursively traverses dictionaries, lists, and strings to replace 
+    the AI-hallucinated 'smmary' with the correct spelling 'summary'.
+    """
+    if isinstance(data, str):
+        return data.replace("smmary", "summary").replace("Smmary", "Summary")
+    elif isinstance(data, dict):
+        return {key: sanitize_ai_text(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [sanitize_ai_text(item) for item in data]
+    return data
 
 @router.get("/referrals")
 def get_referral_analytics(
@@ -1394,10 +1410,6 @@ def get_analytics_metrics(
         )
 
 
-# Pydantic Request Model
-class AskAIRequest(BaseModel):
-    user_question: str
-
 
 @router.post("/ask")
 async def ask_analytics_question(
@@ -1417,7 +1429,11 @@ async def ask_analytics_question(
     service = AnalyticsLLMService(db)
     response = await service.execute_natural_query(payload.user_question)
     
-    return response
+    # Run the safety net to clean up any structural or AI text spelling errors
+    cleaned_response = sanitize_ai_text(response)
+    
+    return cleaned_response
+
 
 @router.get("/dashboard/kpis")
 def get_dashboard_data(db: Session = Depends(get_db)):
@@ -1425,12 +1441,17 @@ def get_dashboard_data(db: Session = Depends(get_db)):
     service = DashboardService(db)
     return service.get_kpi_dashboard_metrics()
 
+
 @router.post("/referrals/{referral_id}/intelligence")
 async def run_referral_ai_enrichment(referral_id: int, db: Session = Depends(get_db)):
     """Extracts, categorizes, and logs intelligence analytics mapping from unstructured referral inputs."""
     service = ReferralIntelligenceService(db)
     try:
         analysis = await service.analyze_referral(referral_id)
-        return {"status": "success", "referral_id": referral_id, "ai_intelligence": analysis}
+        
+        # Applying the sanitizer here as well in case the intelligence engine has the same typo
+        cleaned_analysis = sanitize_ai_text(analysis)
+        
+        return {"status": "success", "referral_id": referral_id, "ai_intelligence": cleaned_analysis}
     except ValueError as val_err:
         raise HTTPException(status_code=404, detail=str(val_err))
