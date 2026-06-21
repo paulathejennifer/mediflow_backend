@@ -218,13 +218,8 @@ class AIService:
 
     def _parse_structured_response(self, response: str) -> Dict[str, str]:
         """
-        Parse structured AI response into dictionary.
-
-        Args:
-            response: AI model response text
-
-        Returns:
-            Dictionary with parsed sections
+        Parse structured AI response into dictionary, scrubbing token-level 
+        vowel drop hallucinations dynamically.
         """
         sections = {}
         current_section = None
@@ -233,8 +228,10 @@ class AIService:
         for line in lines:
             line = line.strip()
             if ":" in line and line.isupper():
-                # New section
-                current_section = line
+                # Normalize common small-model header typos inline
+                normalized_line = line.replace("SMMARY", "SUMMARY")
+                
+                current_section = normalized_line
                 sections[current_section] = ""
             elif current_section and line:
                 # Add content to current section

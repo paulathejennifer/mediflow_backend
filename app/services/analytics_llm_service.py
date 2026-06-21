@@ -68,29 +68,43 @@ class AnalyticsLLMService:
             keys = result_proxy.keys()
             data_payload = [dict(zip(keys, row)) for row in rows]
 
-            # 3. Request LLM to format the data output with strict spelling constraints
-            interpretation_prompt = f"""
-            You are a healthcare operations advisor. Summarize the raw database analytical result sets provided below to answer the user's question clearly.
-            
+            # 3. Separate guardrails into a System Persona to enforce strict compliance
+            system_instruction = (
+                "You are an expert healthcare operations advisor. You must communicate using flawless English grammar. "
+                "CRITICAL: Always start your output exactly with the header '**Summary:**'. "
+                "Never omit vowels, drop letters, or abbreviate headers. Do not use words like 'Smmary' or 'Smmry'."
+            )
+
+            content_payload = f"""
             User Question: {user_question}
             SQL Execution Results: {data_payload}
             
-            Strict Formatting Rules:
-            1. You must write with perfect English spelling. Pay close attention to words like "Summary". Do not use abbreviations, typos, or drop vowels.
-            2. Start your response exactly with the bold header "**Summary:**", followed by a short, direct summary explanation sentence.
-            3. Follow that with a second section starting exactly with the bold header "**Key Items to Pay Attention To:**", followed by bullet points containing analytical observations.
+            Summarize the raw database analytical result sets provided above to answer the user's question clearly.
+            Provide a short, direct summary, followed by a section titled "**Key Items to Pay Attention To:**", containing analytical observations as bullet points.
             """
 
             summary_response = self.client.chat.completions.create(
                 model="llama-3.1-8b-instant",
-                messages=[{"role": "user", "content": interpretation_prompt}],
-                temperature=0.2  # Dropped slightly from 0.3 to reduce spelling variations/hallucinations
+                messages=[
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": content_payload}
+                ],
+                temperature=0.0  # Drop temperature to absolute 0 to stop spelling variations
+            )
+            
+            raw_summary = summary_response.choices[0].message.content.strip()
+            
+            # Bulletproof cleanup pass against token-level model drop hallucinations
+            clean_summary = (
+                raw_summary.replace("Smmary:", "**Summary:**")
+                .replace("smmary:", "**summary:**")
+                .replace("Smmary", "Summary")
             )
             
             return {
                 "generated_sql": generated_sql,
                 "raw_data": data_payload,
-                "conversational_summary": summary_response.choices[0].message.content.strip()
+                "conversational_summary": clean_summary
             }
 
         except Exception as e:
