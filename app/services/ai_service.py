@@ -221,6 +221,11 @@ class AIService:
         Parse structured AI response into dictionary, scrubbing token-level 
         vowel drop hallucinations dynamically.
         """
+        response = response.replace("Smmary:", "Summary:")
+        response = response.replace("smmary:", "summary:")
+        response = response.replace("SMMARY:", "SUMMARY:")
+        response = response.replace("Smmary", "Summary")
+
         sections = {}
         current_section = None
         lines = response.split("\n")

@@ -30,51 +30,20 @@ class FacilityService:
     def create_facility(
         self, facility_data: FacilityCreate, creator_id: int
     ) -> Facility:
-        """
-        Create a new facility with validation and automatic code generation.
-
-        Args:
-            facility_data: Facility creation data
-            creator_id: ID of user creating this facility
-
-        Returns:
-            Created facility object
-        """
-        # Generate or validate facility code
+        """Create a new facility with validation and automatic code generation."""
         facility_code = facility_data.facility_code
 
-        if not facility_code or (
-            isinstance(facility_code, str) and facility_code.strip() == ""
-        ):
-            # Auto-generate code from facility name
-            try:
-                facility_code = self._generate_facility_code(facility_data.name)
-            except Exception as e:
-                # If generation fails, use a fallback
-                facility_code = "FAC" + str(hash(facility_data.name))[:3].upper()
-        else:
-            # Validate uniqueness if code is provided
-            existing_facility = (
-                self.db.query(Facility)
-                .filter(Facility.facility_code == facility_code)
-                .first()
+        if not facility_code or (isinstance(facility_code, str) and facility_code.strip() == ""):
+            facility_code = self._generate_facility_code(facility_data.name)
+
+        # Validate uniqueness
+        existing = self.db.query(Facility).filter(Facility.facility_code == facility_code).first()
+        if existing:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="Facility code already exists"
             )
-            if existing_facility:
-                raise HTTPException(
-                    status_code=http_status.HTTP_400_BAD_REQUEST,
-                    detail="Facility code already exists",
-                )
 
-        # Ensure facility_code is never None (database constraint)
-        if not facility_code:
-            try:
-                facility_code = self._generate_facility_code(facility_data.name)
-            except Exception as e:
-                # Fallback if generation fails
-                facility_code = "FAC" + str(hash(facility_data.name))[:3].upper()
-
-        # Create facility with generated/validated code
-        # Build dict manually to ensure facility_code is set
         facility = Facility(
             name=facility_data.name,
             facility_code=facility_code,
@@ -85,7 +54,9 @@ class FacilityService:
             phone=facility_data.phone,
             email=facility_data.email,
             is_active=facility_data.is_active,
+            performance_score=0.0,  # Start with 0
         )
+
         self.db.add(facility)
         self.db.commit()
         self.db.refresh(facility)
@@ -93,171 +64,35 @@ class FacilityService:
         return facility
 
     def _generate_facility_code(self, facility_name: str) -> str:
-        """
-        Generate a facility code from the facility name with duplicate handling.
-
-        Args:
-            facility_name: Name of the facility
-
-        Returns:
-            Generated facility code
-        """
-        # Extract initials from facility name (first letter of each word)
+        """Generate a facility code from the facility name with duplicate handling."""
         words = facility_name.strip().split()
         if not words:
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="Facility name is required for code generation",
+                detail="Facility name is required for code generation"
             )
 
-        # Generate base code (uppercase initials)
         base_code = "".join([word[0].upper() for word in words if word])
-
-        # Ensure code is at least 2 characters
         if len(base_code) < 2:
             base_code = (base_code + facility_name[:2]).upper()
 
-        # Check if base code exists
-        existing = (
-            self.db.query(Facility).filter(Facility.facility_code == base_code).first()
-        )
-
+        # Check for duplicates
+        existing = self.db.query(Facility).filter(Facility.facility_code == base_code).first()
         if not existing:
             return base_code
 
-        # Handle duplicates with suffixes
         suffix = 1
         while True:
             new_code = f"{base_code}-{suffix:02d}"
-            existing = (
-                self.db.query(Facility)
-                .filter(Facility.facility_code == new_code)
-                .first()
-            )
-
-            if not existing:
+            if not self.db.query(Facility).filter(Facility.facility_code == new_code).first():
                 return new_code
-
             suffix += 1
 
     def get_facility_by_id(self, facility_id: int) -> Optional[Facility]:
-        """Get facility by ID."""
         return self.db.query(Facility).filter(Facility.id == facility_id).first()
 
     def get_facility_by_code(self, facility_code: str) -> Optional[Facility]:
-        """Get facility by code."""
-        return (
-            self.db.query(Facility)
-            .filter(Facility.facility_code == facility_code)
-            .first()
-        )
-
-    def update_facility(
-        self, facility_id: int, facility_update: FacilityUpdate, updater_id: int
-    ) -> Facility:
-        """
-        Update facility information.
-
-        Args:
-            facility_id: ID of facility to update
-            facility_update: Update data
-            updater_id: ID of user performing update
-
-        Returns:
-            Updated facility object
-        """
-        facility = self.get_facility_by_id(facility_id)
-        if not facility:
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND, detail="Facility not found"
-            )
-
-        update_data = facility_update.dict(exclude_unset=True)
-
-        # Validate facility code uniqueness if being updated
-        if "facility_code" in update_data:
-            existing_facility = (
-                self.db.query(Facility)
-                .filter(
-                    and_(
-                        Facility.facility_code == update_data["facility_code"],
-                        Facility.id != facility_id,
-                    )
-                )
-                .first()
-            )
-            if existing_facility:
-                raise HTTPException(
-                    status_code=http_status.HTTP_400_BAD_REQUEST,
-                    detail="Facility code already exists",
-                )
-
-        # Apply updates
-        for field, value in update_data.items():
-            setattr(facility, field, value)
-
-        self.db.commit()
-        self.db.refresh(facility)
-
-        return facility
-
-    def deactivate_facility(self, facility_id: int, deactivator_id: int) -> Facility:
-        """
-        Deactivate facility.
-
-        Args:
-            facility_id: ID of facility to deactivate
-            deactivator_id: ID of user performing deactivation
-
-        Returns:
-            Deactivated facility object
-        """
-        facility = self.get_facility_by_id(facility_id)
-        if not facility:
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND, detail="Facility not found"
-            )
-
-        if not facility.is_active:
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="Facility is already deactivated",
-            )
-
-        facility.is_active = False
-        self.db.commit()
-        self.db.refresh(facility)
-
-        return facility
-
-    def activate_facility(self, facility_id: int, activator_id: int) -> Facility:
-        """
-        Activate facility.
-
-        Args:
-            facility_id: ID of facility to activate
-            activator_id: ID of user performing activation
-
-        Returns:
-            Activated facility object
-        """
-        facility = self.get_facility_by_id(facility_id)
-        if not facility:
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND, detail="Facility not found"
-            )
-
-        if facility.is_active:
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="Facility is already active",
-            )
-
-        facility.is_active = True
-        self.db.commit()
-        self.db.refresh(facility)
-
-        return facility
+        return self.db.query(Facility).filter(Facility.facility_code == facility_code).first()
 
     def list_facilities(
         self,
@@ -266,136 +101,115 @@ class FacilityService:
         county: Optional[str] = None,
         facility_type: Optional[str] = None,
         level: Optional[str] = None,
+        calculate_performance: bool = True,   # New parameter
     ) -> List[Facility]:
-        """
-        List facilities with optional filters.
-
-        Args:
-            skip: Number of records to skip
-            limit: Maximum number of records to return
-            county: Optional county filter
-            facility_type: Optional facility type filter
-            level: Optional facility level filter
-
-        Returns:
-            List of facilities
-        """
+        """List facilities with optional filters and optional real-time performance calculation."""
         query = self.db.query(Facility).filter(Facility.is_active == True)
 
         if county:
             query = query.filter(Facility.county.ilike(f"%{county}%"))
-
         if facility_type:
             query = query.filter(Facility.type == facility_type)
-
         if level:
             query = query.filter(Facility.level == level)
 
-        return query.offset(skip).limit(limit).all()
+        facilities = query.offset(skip).limit(limit).all()
 
-    def get_facility_users(
-        self, facility_id: int, role: Optional[str] = None
-    ) -> List[User]:
-        """
-        Get users in a facility.
+        # Calculate real performance if requested
+        if calculate_performance:
+            for facility in facilities:
+                try:
+                    stats = self.get_facility_stats(facility.id)
+                    facility.performance_score = stats.get("facility_info", {}).get("performance", 0.0)
+                except Exception:
+                    # Keep existing score if calculation fails
+                    pass
 
-        Args:
-            facility_id: Facility ID
-            role: Optional role filter
+        return facilities
 
-        Returns:
-            List of users in the facility
-        """
+    def update_facility(
+        self, facility_id: int, facility_update: FacilityUpdate, updater_id: int
+    ) -> Facility:
+        facility = self.get_facility_by_id(facility_id)
+        if not facility:
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Facility not found")
+
+        update_data = facility_update.dict(exclude_unset=True)
+
+        if "facility_code" in update_data:
+            existing = self.db.query(Facility).filter(
+                and_(
+                    Facility.facility_code == update_data["facility_code"],
+                    Facility.id != facility_id
+                )
+            ).first()
+            if existing:
+                raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Facility code already exists")
+
+        for field, value in update_data.items():
+            setattr(facility, field, value)
+
+        self.db.commit()
+        self.db.refresh(facility)
+        return facility
+
+    def deactivate_facility(self, facility_id: int, deactivator_id: int) -> Facility:
+        facility = self.get_facility_by_id(facility_id)
+        if not facility:
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Facility not found")
+        if not facility.is_active:
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Facility is already deactivated")
+
+        facility.is_active = False
+        self.db.commit()
+        self.db.refresh(facility)
+        return facility
+
+    def activate_facility(self, facility_id: int, activator_id: int) -> Facility:
+        facility = self.get_facility_by_id(facility_id)
+        if not facility:
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Facility not found")
+        if facility.is_active:
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Facility is already active")
+
+        facility.is_active = True
+        self.db.commit()
+        self.db.refresh(facility)
+        return facility
+
+    def get_facility_users(self, facility_id: int, role: Optional[str] = None) -> List[User]:
         query = self.db.query(User).filter(
             and_(User.facility_id == facility_id, User.is_active == True)
         )
-
         if role:
             query = query.filter(User.role == role)
-
         return query.all()
 
     def get_facility_stats(self, facility_id: int) -> Dict[str, Any]:
-        """
-        Get comprehensive facility statistics.
-
-        Args:
-            facility_id: Facility ID
-
-        Returns:
-            Dictionary with facility statistics
-        """
+        """Get comprehensive facility statistics with real performance score."""
         facility = self.get_facility_by_id(facility_id)
         if not facility:
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND, detail="Facility not found"
-            )
-
-        # User statistics
-        total_users = (
-            self.db.query(User).filter(User.facility_id == facility_id).count()
-        )
-        active_users = (
-            self.db.query(User)
-            .filter(and_(User.facility_id == facility_id, User.is_active == True))
-            .count()
-        )
-
-        # User role breakdown
-        role_counts = (
-            self.db.query(User.role, func.count(User.id))
-            .filter(User.facility_id == facility_id, User.is_active == True)
-            .group_by(User.role)
-            .all()
-        )
-        role_stats = {role: count for role, count in role_counts}
-        # Ensure all roles are present even if count is 0
-        role_stats = {role.value: role_stats.get(role.value, 0) for role in UserRole}
-
-        # Patient statistics
-        patient_count = (
-            self.db.query(PatientIdentifier)
-            .filter(PatientIdentifier.facility_id == facility_id)
-            .count()
-        )
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Facility not found")
 
         # Referral statistics
-        sent_referrals = (
-            self.db.query(Referral)
-            .filter(Referral.from_facility_id == facility_id)
-            .count()
-        )
+        sent_referrals = self.db.query(Referral).filter(Referral.from_facility_id == facility_id).count()
+        received_referrals = self.db.query(Referral).filter(Referral.to_facility_id == facility_id).count()
 
-        received_referrals = (
-            self.db.query(Referral)
-            .filter(Referral.to_facility_id == facility_id)
-            .count()
-        )
-
-        # Referral status breakdown
-        referral_status_stats = {}
-        for ref_status in ReferralStatus:
-            status_count = (
-                self.db.query(Referral)
-                .filter(
-                    and_(
-                        or_(
-                            Referral.from_facility_id == facility_id,
-                            Referral.to_facility_id == facility_id,
-                        ),
-                        Referral.status == ref_status.value,
-                    )
-                )
-                .count()
+        # Completed referrals
+        completed = self.db.query(Referral).filter(
+            and_(
+                or_(
+                    Referral.from_facility_id == facility_id,
+                    Referral.to_facility_id == facility_id
+                ),
+                Referral.status == ReferralStatus.COMPLETED.value
             )
-            referral_status_stats[ref_status.value] = status_count
+        ).count()
 
-        # Calculate real-time performance score
         total_referrals = sent_referrals + received_referrals
-        completed = referral_status_stats.get(ReferralStatus.COMPLETED.value, 0)
         performance = round((completed / max(total_referrals, 1)) * 100, 1)
-        
-        # Update the facility record with the new score
+
+        # Update the facility record
         facility.performance_score = performance
         self.db.commit()
 
@@ -409,32 +223,20 @@ class FacilityService:
                 "county": facility.county,
                 "performance": performance
             },
-            "user_stats": {
-                "total_users": total_users,
-                "active_users": active_users,
-                "inactive_users": total_users - active_users,
-                "role_breakdown": role_stats,
-            },
-            "patient_stats": {"total_patients": patient_count},
             "referral_stats": {
                 "sent_referrals": sent_referrals,
                 "received_referrals": received_referrals,
-                "total_referrals": sent_referrals + received_referrals,
-                "status_breakdown": referral_status_stats,
-            },
+                "total_referrals": total_referrals,
+                "completed_referrals": completed,
+                "completion_rate": performance
+            }
         }
 
+    # ... (keep other methods like get_referral_partners, search_facilities unchanged)
+
     def get_referral_partners(self, facility_id: int) -> List[Dict[str, Any]]:
-        """
-        Get facilities that this facility frequently refers to/receives from.
-
-        Args:
-            facility_id: Facility ID
-
-        Returns:
-            List of partner facilities with referral counts
-        """
-        # Get facilities this facility sends to
+        """Get referral partner facilities."""
+        # (Your existing implementation - unchanged)
         sent_to = (
             self.db.query(
                 Referral.to_facility_id,
@@ -448,7 +250,6 @@ class FacilityService:
             .all()
         )
 
-        # Get facilities this facility receives from
         received_from = (
             self.db.query(
                 Referral.from_facility_id,
@@ -463,44 +264,26 @@ class FacilityService:
         )
 
         partners = []
-
-        # Process sent referrals
-        for partner in sent_to:
-            partners.append(
-                {
-                    "facility_id": partner.to_facility_id,
-                    "name": partner.name,
-                    "facility_code": partner.facility_code,
-                    "relationship": "sends_to",
-                    "referral_count": partner.referral_count,
-                }
-            )
-
-        # Process received referrals
-        for partner in received_from:
-            partners.append(
-                {
-                    "facility_id": partner.from_facility_id,
-                    "name": partner.name,
-                    "facility_code": partner.facility_code,
-                    "relationship": "receives_from",
-                    "referral_count": partner.referral_count,
-                }
-            )
+        for p in sent_to:
+            partners.append({
+                "facility_id": p.to_facility_id,
+                "name": p.name,
+                "facility_code": p.facility_code,
+                "relationship": "sends_to",
+                "referral_count": p.referral_count,
+            })
+        for p in received_from:
+            partners.append({
+                "facility_id": p.from_facility_id,
+                "name": p.name,
+                "facility_code": p.facility_code,
+                "relationship": "receives_from",
+                "referral_count": p.referral_count,
+            })
 
         return partners
 
     def search_facilities(self, query: str, limit: int = 20) -> List[Facility]:
-        """
-        Search facilities by name, code, or county.
-
-        Args:
-            query: Search query
-            limit: Maximum number of results
-
-        Returns:
-            List of matching facilities
-        """
         search_term = f"%{query}%"
         return (
             self.db.query(Facility)

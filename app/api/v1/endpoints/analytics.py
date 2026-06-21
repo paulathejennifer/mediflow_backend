@@ -1455,3 +1455,19 @@ async def run_referral_ai_enrichment(referral_id: int, db: Session = Depends(get
         return {"status": "success", "referral_id": referral_id, "ai_intelligence": cleaned_analysis}
     except ValueError as val_err:
         raise HTTPException(status_code=404, detail=str(val_err))
+
+@router.get("/referrals/by-specialty")
+def get_referrals_by_specialty(db: Session = Depends(get_db)):
+    """Return referrals grouped by AI-extracted specialty."""
+    # Example query (adjust based on how you store specialty in ai_summary)
+    result = db.query(
+        func.json_extract(Referral.ai_summary, '$.v2_intelligence.specialty').label('specialty'),
+        func.count(Referral.id).label('count')
+    ).filter(
+        Referral.ai_summary.isnot(None)
+    ).group_by('specialty').all()
+
+    labels = [r.specialty or "Unclassified" for r in result]
+    counts = [r.count for r in result]
+
+    return {"labels": labels, "data": counts}

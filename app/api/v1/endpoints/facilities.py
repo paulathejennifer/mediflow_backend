@@ -64,7 +64,6 @@ async def create_facility(
             detail=f"Failed to create facility: {str(e)}",
         )
 
-
 @router.get("", response_model=List[FacilitySummary])
 @router.get("/", response_model=List[FacilitySummary])
 def list_facilities(
@@ -76,41 +75,45 @@ def list_facilities(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List facilities with optional filters."""
-    # Correct Boolean comparison for PostgreSQL
-    query = db.query(Facility).filter(Facility.is_active == True)
+    """List facilities with optional filters and real performance scores."""
+    facility_service = FacilityService(db)
 
-    # Apply filters
-    if county:
-        query = query.filter(Facility.county.ilike(f"%{county}%"))
+    # Use service method for consistency
+    facilities = facility_service.list_facilities(
+        skip=skip,
+        limit=limit,
+        county=county,
+        facility_type=facility_type,
+        level=level,
+    )
 
-    if facility_type:
-        query = query.filter(Facility.type == facility_type)
+    result = []
+    for f in facilities:
+        try:
+            # Calculate real performance for each facility
+            stats = facility_service.get_facility_stats(f.id)
+            performance = stats["facility_info"].get("performance", 0.0)
+        except Exception:
+            performance = f.performance_score or 0.0
 
-    if level:
-        query = query.filter(Facility.level == level)
-
-
-    facilities = query.offset(skip).limit(limit).all()
-
-    return [
-        FacilitySummary(
-            id=f.id,
-            name=f.name,
-            facility_code=f.facility_code,
-            type=f.type,
-            level=f.level,
-            county=f.county,
-            address=f.address,
-            phone=f.phone,
-            email=f.email,
-            performance_score=f.performance_score,
-            created_at=f.created_at,
-            updated_at=f.updated_at,
+        result.append(
+            FacilitySummary(
+                id=f.id,
+                name=f.name,
+                facility_code=f.facility_code,
+                type=f.type,
+                level=f.level,
+                county=f.county,
+                address=f.address,
+                phone=f.phone,
+                email=f.email,
+                performance_score=performance,   # ← Use real calculated score
+                created_at=f.created_at,
+                updated_at=f.updated_at,
+            )
         )
-        for f in facilities
-    ]
 
+    return result
 
 @router.get("/{facility_id}", response_model=FacilityResponse)
 def get_facility(
