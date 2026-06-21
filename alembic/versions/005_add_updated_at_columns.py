@@ -17,36 +17,48 @@ depends_on = None
 
 
 def upgrade():
-    # Get a database connection and inspect existing columns dynamically
+    # Retrieve the database connection from the active operational context
     bind = op.get_bind()
     inspect_obj = reflection.Inspector.from_engine(bind)
     
     # 1. Safe addition for 'referral_documents' table
-    ref_doc_columns = [c['name'] for c in inspect_obj.get_columns('referral_documents')]
-    if 'updated_at' not in ref_doc_columns:
-        op.add_column('referral_documents', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
-    else:
-        print("Column 'updated_at' already exists in 'referral_documents'. Skipping.")
+    try:
+        ref_doc_columns = [c['name'] for c in inspect_obj.get_columns('referral_documents')]
+        if 'updated_at' not in ref_doc_columns:
+            op.add_column('referral_documents', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
+        else:
+            print("Column 'updated_at' already exists in 'referral_documents'. Skipping.")
+    except Exception as e:
+        # Catch fallback if the table doesn't exist yet or is locked
+        print(f"Skipping updated_at addition for referral_documents: {e}")
 
     # 2. Safe addition for 'voice_notes' table
-    voice_note_columns = [c['name'] for c in inspect_obj.get_columns('voice_notes')]
-    if 'updated_at' not in voice_note_columns:
-        op.add_column('voice_notes', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
-    else:
-        print("Column 'updated_at' already exists in 'voice_notes'. Skipping.")
+    try:
+        voice_note_columns = [c['name'] for c in inspect_obj.get_columns('voice_notes')]
+        if 'updated_at' not in voice_note_columns:
+            op.add_column('voice_notes', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
+        else:
+            print("Column 'updated_at' already exists in 'voice_notes'. Skipping.")
+    except Exception as e:
+        print(f"Skipping updated_at addition for voice_notes: {e}")
 
 
 def downgrade():
-    # Get a database connection and inspect existing columns before dropping
     bind = op.get_bind()
     inspect_obj = reflection.Inspector.from_engine(bind)
     
     # Safe fallback for voice_notes downgrade
-    voice_note_columns = [c['name'] for c in inspect_obj.get_columns('voice_notes')]
-    if 'updated_at' in voice_note_columns:
-        op.drop_column('voice_notes', 'updated_at')
+    try:
+        voice_note_columns = [c['name'] for c in inspect_obj.get_columns('voice_notes')]
+        if 'updated_at' in voice_note_columns:
+            op.drop_column('voice_notes', 'updated_at')
+    except Exception as e:
+        print(f"Skipping column removal for voice_notes during downgrade: {e}")
 
     # Safe fallback for referral_documents downgrade
-    ref_doc_columns = [c['name'] for c in inspect_obj.get_columns('referral_documents')]
-    if 'updated_at' in ref_doc_columns:
-        op.drop_column('referral_documents', 'updated_at')
+    try:
+        ref_doc_columns = [c['name'] for c in inspect_obj.get_columns('referral_documents')]
+        if 'updated_at' in ref_doc_columns:
+            op.drop_column('referral_documents', 'updated_at')
+    except Exception as e:
+        print(f"Skipping column removal for referral_documents during downgrade: {e}")
