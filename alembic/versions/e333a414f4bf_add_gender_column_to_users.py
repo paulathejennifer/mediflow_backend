@@ -26,10 +26,12 @@ def upgrade() -> None:
         op.drop_table('_alembic_tmp_audit_logs')
 
     with op.batch_alter_table('audit_logs', schema=None) as batch_op:
+        # Fixed: Added postgresql_using argument to explicitly cast existing TEXT rows to valid JSON rows
         batch_op.alter_column('details',
                existing_type=sa.TEXT(),
                type_=sa.JSON(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using='details::json')
 
     with op.batch_alter_table('notifications', schema=None) as batch_op:
         batch_op.add_column(sa.Column('facility_id', sa.Integer(), nullable=True))
@@ -63,10 +65,12 @@ def downgrade() -> None:
         batch_op.drop_column('facility_id')
 
     with op.batch_alter_table('audit_logs', schema=None) as batch_op:
+        # Fixed: Added postgresql_using argument to convert back from JSON to TEXT safely during downgrades
         batch_op.alter_column('details',
                existing_type=sa.JSON(),
                type_=sa.TEXT(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using='details::text')
 
     # Safely recreate the temporary table during downgrade if you are rolling back on SQLite
     conn = op.get_bind()
