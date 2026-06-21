@@ -8,7 +8,6 @@ Create Date: 2026-05-25 12:00:00.000000
 from alembic import op
 import sqlalchemy as sa
 
-
 # revision identifiers, used by Alembic.
 revision = '009_add_patient_facility_id'
 down_revision = '008_patient_id_updated_at'
@@ -17,24 +16,34 @@ depends_on = None
 
 
 def upgrade():
-    # Check if column exists first to avoid "duplicate column" error
     conn = op.get_bind()
     inspector = sa.inspect(conn)
-    columns = [c['name'] for c in inspector.get_columns('patients')]
     
+    # 1. Safe Column Addition
+    columns = [c['name'] for c in inspector.get_columns('patients')]
     if 'facility_id' not in columns:
         op.add_column('patients', sa.Column('facility_id', sa.Integer(), nullable=True))
+    else:
+        print("Column 'facility_id' already exists in 'patients'. Skipping.")
 
-    try:
+    # 2. Safe Index Creation (No naked try/except blocks to prevent transaction poisoning)
+    indexes = [idx['name'] for idx in inspector.get_indexes('patients')]
+    if 'ix_patients_facility_id' not in indexes:
         op.create_index(op.f('ix_patients_facility_id'), 'patients', ['facility_id'], unique=False)
-    except Exception:
-        # index may already exist
-        pass
+    else:
+        print("Index 'ix_patients_facility_id' already exists on 'patients'. Skipping.")
 
 
 def downgrade():
-    try:
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    
+    # Safe Index Dropping
+    indexes = [idx['name'] for idx in inspector.get_indexes('patients')]
+    if 'ix_patients_facility_id' in indexes:
         op.drop_index(op.f('ix_patients_facility_id'), table_name='patients')
-    except Exception:
-        pass
-    op.drop_column('patients', 'facility_id')
+        
+    # Safe Column Dropping
+    columns = [c['name'] for c in inspector.get_columns('patients')]
+    if 'facility_id' in columns:
+        op.drop_column('patients', 'facility_id')
