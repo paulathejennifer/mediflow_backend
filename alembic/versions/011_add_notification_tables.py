@@ -6,6 +6,7 @@ Create Date: 2026-05-25 14:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '011_add_notification_tables'
@@ -25,9 +26,10 @@ def upgrade():
             sa.Column('notification_type', sa.String(length=255), nullable=False),
             sa.Column('title', sa.String(length=255), nullable=False),
             sa.Column('message', sa.Text(), nullable=False),
-            sa.Column('details', sa.JSON(), nullable=False, server_default=sa.text("'{}'::json")),
-            sa.Column('actions', sa.JSON(), nullable=False, server_default=sa.text("'[]'::json")),
-            sa.Column('roles', sa.JSON(), nullable=False, server_default=sa.text("'[]'::json")),
+            # Changed to JSONB to support the PostgreSQL @> containment operator
+            sa.Column('details', postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+            sa.Column('actions', postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
+            sa.Column('roles', postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
             sa.Column('backend_source', sa.String(length=255), nullable=False, server_default=sa.text("'system'")),
             sa.Column('trigger_condition', sa.Text(), nullable=True),
             sa.Column('is_read', sa.Boolean(), nullable=False, server_default=sa.text('false')),
@@ -49,7 +51,8 @@ def upgrade():
             sa.Column('delivery_status', sa.String(length=255), nullable=False, server_default=sa.text("'pending'")),
             sa.Column('delivered_at', sa.DateTime(timezone=True), nullable=True),
             sa.Column('action_taken', sa.String(length=255), nullable=True),
-            sa.Column('action_result', sa.JSON(), nullable=True),
+            # Changed to JSONB for consistency across models
+            sa.Column('action_result', postgresql.JSONB(), nullable=True),
             sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
         )
         op.create_index(op.f('ix_notification_deliveries_notification_id'), 'notification_deliveries', ['notification_id'], unique=False)
@@ -63,7 +66,8 @@ def upgrade():
             sa.Column('notification_type', sa.String(length=255), nullable=False),
             sa.Column('title_template', sa.String(length=255), nullable=False),
             sa.Column('message_template', sa.Text(), nullable=False),
-            sa.Column('default_roles', sa.JSON(), nullable=False, server_default=sa.text("'[]'::json")),
+            # Changed to JSONB
+            sa.Column('default_roles', postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
             sa.Column('backend_source', sa.String(length=255), nullable=False, server_default=sa.text("'system'")),
             sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('true')),
             sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
@@ -75,7 +79,8 @@ def upgrade():
             sa.Column('id', sa.Integer(), primary_key=True, nullable=False),
             sa.Column('metric_name', sa.String(length=255), nullable=False),
             sa.Column('metric_value', sa.String(length=255), nullable=True),
-            sa.Column('details', sa.JSON(), nullable=False, server_default=sa.text("'{}'::json")),
+            # Changed to JSONB
+            sa.Column('details', postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
             sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
         )
 
@@ -86,7 +91,8 @@ def upgrade():
             sa.Column('user_id', sa.Integer(), sa.ForeignKey('users.id'), nullable=False),
             sa.Column('notification_type', sa.String(length=255), nullable=False),
             sa.Column('enabled', sa.Boolean(), nullable=False, server_default=sa.text('true')),
-            sa.Column('delivery_methods', sa.JSON(), nullable=False, server_default=sa.text("'[\"websocket\"]'::json")),
+            # Changed to JSONB
+            sa.Column('delivery_methods', postgresql.JSONB(), nullable=False, server_default=sa.text("'[\"websocket\"]'::jsonb")),
             sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
             sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
         )

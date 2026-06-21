@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Text, JSON
+#  CORRECT IMPORTS
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -13,9 +15,9 @@ class Notification(Base):
     notification_type = Column(String, nullable=False)
     title = Column(String, nullable=False)
     message = Column(Text, nullable=False)
-    details = Column(JSON, default={})
-    actions = Column(JSON, default=[])
-    roles = Column(JSON, default=[])
+    details = Column(JSONB, default={})
+    actions = Column(JSONB, default=[])
+    roles = Column(JSONB, default=[])
     backend_source = Column(String, default="system")
     trigger_condition = Column(Text, nullable=True)
     is_read = Column(Boolean, default=False)
@@ -42,7 +44,7 @@ class NotificationDelivery(Base):
     delivered_at = Column(DateTime(timezone=True), nullable=True)
     read_at = Column(DateTime(timezone=True), nullable=True)
     action_taken = Column(String, nullable=True)
-    action_result = Column(JSON, nullable=True)
+    action_result = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -60,7 +62,7 @@ class NotificationTemplate(Base):
     notification_type = Column(String, nullable=False)
     title_template = Column(String, nullable=False)
     message_template = Column(Text, nullable=False)
-    default_roles = Column(JSON, default=[])
+    default_roles = Column(JSONB, default=[])
     backend_source = Column(String, default="system")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -75,7 +77,7 @@ class SystemMetric(Base):
     id = Column(Integer, primary_key=True, index=True)
     metric_name = Column(String, nullable=False)
     metric_value = Column(String, nullable=True)
-    details = Column(JSON, default={})
+    details = Column(JSONB, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self):
@@ -89,7 +91,7 @@ class NotificationPreference(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     notification_type = Column(String, nullable=False)
     enabled = Column(Boolean, default=True)
-    delivery_methods = Column(JSON, default=["websocket"])
+    delivery_methods = Column(JSONB, default=["websocket"])
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
