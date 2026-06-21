@@ -70,9 +70,10 @@ class AnalyticsLLMService:
 
             # 3. Separate guardrails into a System Persona to enforce strict compliance
             system_instruction = (
-                "You are an expert healthcare operations advisor. You must communicate using flawless English grammar. "
-                "CRITICAL: Always start your output exactly with the header '**Summary:**'. "
-                "Never omit vowels, drop letters, or abbreviate headers. Do not use words like 'Smmary' or 'Smmry'."
+    "You are an expert healthcare operations advisor. You must communicate using flawless English grammar. "
+    "CRITICAL: The FIRST word of your output must be exactly '**Summary:**' with double asterisks and the letter 'u'. "
+    "DO NOT write 'Smmary', 'Smmry', 'summary', or any misspelling. "
+    "If you accidentally misspell it, REWRITE it correctly as '**Summary:**' before sending your response."
             )
 
             content_payload = f"""
