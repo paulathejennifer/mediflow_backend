@@ -53,7 +53,7 @@ class FacilityService:
             address=facility_data.address,
             phone=facility_data.phone,
             email=facility_data.email,
-            is_active=facility_data.is_active,
+            is_active=True, 
             performance_score=0.0,  # Start with 0
         )
 

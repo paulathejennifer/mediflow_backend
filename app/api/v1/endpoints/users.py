@@ -11,6 +11,7 @@ from app.models.facility import Facility
 from app.services.auth_service import AuthService, get_auth_service
 from app.enums import UserRole, AuditAction
 from app.services.notification_service import get_notification_service
+from app.services.user_service import UserService, get_user_service
 
 router = APIRouter()
 
@@ -21,23 +22,17 @@ async def create_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Create a new user (Admin only)."""
-    permission_checker = get_permission_checker(current_user, db)
-
     # Check permissions
     if current_user.role == UserRole.SUPER_ADMIN:
-        # Super admin can create any user type
         pass
     elif current_user.role == UserRole.FACILITY_ADMIN:
-        # Facility admin can only create clinicians and patients in their facility
         if user_data.role not in [UserRole.CLINICIAN.value, UserRole.PATIENT.value]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Facility admins can only create clinicians and patients",
             )
-
         if user_data.facility_id != current_user.facility_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -45,25 +40,13 @@ async def create_user(
             )
     else:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can create users"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can create users",
         )
 
     try:
-        user = auth_service.create_user(user_data)
-
-        # Log creation
-        audit_logger = create_audit_logger(db)
-        audit_logger.log_action(
-            user_id=current_user.id,
-            action=AuditAction.CREATE.value,
-            entity_type="user",
-            entity_id=user.id,
-            details={
-                "email": user.email,
-                "role": user.role,
-                "facility_id": user.facility_id,
-            },
-        )
+        user_service = UserService(db)
+        user = user_service.create_user(user_data, creator_id=current_user.id)
 
         # Trigger Role-Based Notifications
         notif_service = get_notification_service(db)
