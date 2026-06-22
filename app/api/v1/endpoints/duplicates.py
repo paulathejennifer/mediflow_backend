@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
-
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
@@ -10,6 +10,45 @@ from app.ml.patient_deduplicator import PatientDeduplicator
 from app.models.duplicate_patient import DuplicatePatientPair
 
 router = APIRouter()
+
+class PreCheckRequest(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+@router.post("/pre-check", response_model=List[Dict[str, Any]])
+def pre_check_duplicate(
+    data: PreCheckRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Real-time duplicate check against form input BEFORE patient is created.
+    Constructs a temporary Patient-like object for the ML engine to evaluate.
+    """
+    from datetime import date as date_type
+
+    # Build a temporary candidate object without saving to DB
+    candidate = Patient(
+        id=None,
+        first_name=data.first_name or "",
+        last_name=data.last_name or "",
+        phone=data.phone or "",
+        email=data.email or "",
+        date_of_birth=date_type.fromisoformat(data.date_of_birth) if data.date_of_birth else None,
+        emergency_contact_name=None,
+        emergency_contact_phone=None,
+        allergies=None,
+        medications=None,
+        chronic_conditions=None,
+    )
+
+    deduplicator = PatientDeduplicator(db)
+    results = deduplicator.evaluate_patient(candidate)
+    return results
+
 
 @router.post("/scan/{patient_id}", response_model=List[Dict[str, Any]])
 def scan_patient_duplicates(
