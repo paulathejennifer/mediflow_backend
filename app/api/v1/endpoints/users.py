@@ -8,10 +8,10 @@ from app.utils.audit_utils import create_audit_logger
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.models.user import User
 from app.models.facility import Facility
+from app.services.user_service import UserService
 from app.services.auth_service import AuthService, get_auth_service
 from app.enums import UserRole, AuditAction
 from app.services.notification_service import get_notification_service
-from app.services.user_service import UserService, get_user_service
 
 router = APIRouter()
 
@@ -24,7 +24,6 @@ async def create_user(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new user (Admin only)."""
-    # Check permissions
     if current_user.role == UserRole.SUPER_ADMIN:
         pass
     elif current_user.role == UserRole.FACILITY_ADMIN:
@@ -48,7 +47,6 @@ async def create_user(
         user_service = UserService(db)
         user = user_service.create_user(user_data, creator_id=current_user.id)
 
-        # Trigger Role-Based Notifications
         notif_service = get_notification_service(db)
         if user.role == UserRole.FACILITY_ADMIN.value:
             facility = db.query(Facility).filter(Facility.id == user.facility_id).first()
@@ -83,32 +81,23 @@ def list_users(
     """List users accessible to the current user."""
     query = db.query(User)
 
-    # Apply role-based filtering
     if current_user.role == UserRole.SUPER_ADMIN:
-        # Super admin can see all users
         pass
     elif current_user.role == UserRole.FACILITY_ADMIN:
-        # Facility admin can only see users in their facility
         query = query.filter(User.facility_id == current_user.facility_id)
     elif current_user.role == UserRole.CLINICIAN:
-        # Clinicians can only see users in their facility
         query = query.filter(User.facility_id == current_user.facility_id)
     else:
-        # Patients can only see themselves
         query = query.filter(User.id == current_user.id)
 
-    # Apply filters
     if role:
         query = query.filter(User.role == role)
-
     if facility_id and current_user.role == UserRole.SUPER_ADMIN:
         query = query.filter(User.facility_id == facility_id)
-
     if is_active is not None:
         query = query.filter(User.is_active == is_active)
 
-    users = query.offset(skip).limit(limit).all()
-    return users
+    return query.offset(skip).limit(limit).all()
 
 
 @router.get("/{user_id}", response_model=UserResponse)
@@ -123,9 +112,7 @@ def get_user(
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return user
 
@@ -143,15 +130,11 @@ def update_user(
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     try:
-        # Update fields
         update_data = user_update.dict(exclude_unset=True)
 
-        # Facility admins can't change roles or facility assignments
         if current_user.role == UserRole.FACILITY_ADMIN:
             if "role" in update_data or "facility_id" in update_data:
                 raise HTTPException(
@@ -165,7 +148,6 @@ def update_user(
         db.commit()
         db.refresh(user)
 
-        # Log update
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
@@ -200,11 +182,8 @@ def deactivate_user(
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    # Cannot deactivate self
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -214,7 +193,6 @@ def deactivate_user(
     try:
         auth_service.deactivate_user(user_id)
 
-        # Log deactivation
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
@@ -250,11 +228,8 @@ def hard_delete_user(
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    # Cannot delete self
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -262,29 +237,15 @@ def hard_delete_user(
         )
 
     try:
-        # Delete associated audit logs first (they have NOT NULL constraint on user_id)
         from app.models.audit_log import AuditLog
-
-        db.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
-
-        # Delete other related records
         from app.models.refresh_token import RefreshToken
-
-        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
-
         from app.models.password_reset_token import PasswordResetToken
-
-        db.query(PasswordResetToken).filter(
-            PasswordResetToken.user_id == user_id
-        ).delete()
-
         from app.models.email_verification_token import EmailVerificationToken
 
-        db.query(EmailVerificationToken).filter(
-            EmailVerificationToken.user_id == user_id
-        ).delete()
-
-        # Delete the user
+        db.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
+        db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user_id).delete()
+        db.query(EmailVerificationToken).filter(EmailVerificationToken.user_id == user_id).delete()
         db.delete(user)
         db.commit()
 
@@ -311,14 +272,11 @@ def activate_user(
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     try:
         auth_service.activate_user(user_id)
 
-        # Log activation
         audit_logger = create_audit_logger(db)
         audit_logger.log_action(
             user_id=current_user.id,
