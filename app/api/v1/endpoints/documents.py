@@ -389,3 +389,12 @@ def delete_document(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete document: {str(e)}",
         )
+
+@router.get("/documents/{document_id}/download")
+def download_document(document_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    doc = db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    # Return file response (adjust path logic as per your storage)
+    return FileResponse(doc.file_path, filename=doc.file_name)
