@@ -58,7 +58,7 @@ async def create_referral(
 @router.get("/", response_model=List[ReferralSummary])
 def list_referrals(
     skip: int = Query(0),
-    limit: int = Query(100),
+    limit: int = Query(1000),  # increased from 100
     patient_id: Optional[int] = Query(None),
     status: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -69,12 +69,10 @@ def list_referrals(
         joinedload(Referral.from_facility),
         joinedload(Referral.to_facility)
     )
-    
-    # Strict facility-based multi-tenancy filtering
+
     if current_user.role != UserRole.SUPER_ADMIN.value:
         if not current_user.facility_id:
-             # If a non-admin has no facility, they see nothing (safety first)
-             return []
+            return []
         query = query.filter(
             or_(
                 Referral.from_facility_id == current_user.facility_id,
@@ -86,7 +84,25 @@ def list_referrals(
         query = query.filter(Referral.patient_id == patient_id)
     if status:
         query = query.filter(Referral.status == status)
-    return query.order_by(Referral.created_at.desc()).offset(skip).limit(limit).all()
+
+    referrals = query.order_by(Referral.created_at.desc()).offset(skip).limit(limit).all()
+
+    return [
+        {
+            "id": r.id,
+            "patient_name": r.patient_name,
+            "from_facility_name": r.from_facility_name,
+            "from_facility_id": r.from_facility_id,
+            "to_facility_name": r.to_facility_name,
+            "to_facility_id": r.to_facility_id,
+            "status": r.status,
+            "priority": r.priority,
+            "created_at": r.created_at,
+            "reason_for_referral": r.reason_for_referral,
+            "created_by": r.created_by,
+        }
+        for r in referrals
+    ]
 
 @router.get("/{referral_id}", response_model=ReferralWithDetails)
 @router.get("/{referral_id}/", response_model=ReferralWithDetails)
