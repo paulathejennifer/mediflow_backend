@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
+from pathlib import Path
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.utils.permissions import get_permission_checker
@@ -390,11 +392,53 @@ def delete_document(
             detail=f"Failed to delete document: {str(e)}",
         )
 
-@router.get("/documents/{document_id}/download")
-def download_document(document_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+
+
+# ====================== PREVIEW & DOWNLOAD ======================
+
+@router.get("/{document_id}/view")
+def view_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Serve document for inline preview (iframe/image)"""
     doc = db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
-    if not doc:
-        raise HTTPException(404, "Document not found")
     
-    # Return file response (adjust path logic as per your storage)
-    return FileResponse(doc.file_path, filename=doc.file_name)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    file_path = Path(doc.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found on server")
+
+    # Return file with correct media type for preview
+    return FileResponse(
+        path=file_path,
+        filename=doc.file_name,
+        media_type="application/octet-stream"  # Let browser decide
+    )
+
+
+@router.get("/{document_id}/download")
+def download_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Force download with proper headers"""
+    doc = db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
+    
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    file_path = Path(doc.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found on server")
+
+    return FileResponse(
+        path=file_path,
+        filename=doc.file_name,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{doc.file_name}"'}
+    )
