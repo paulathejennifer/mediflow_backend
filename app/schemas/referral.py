@@ -96,9 +96,9 @@ class ReferralSummary(BaseModel):
     priority: str
     created_at: datetime
     reason_for_referral: Optional[str] = None
+    created_by: int              # ← add this
 
     model_config = ConfigDict(from_attributes=True)
-
 
 class ReferralWithDetails(ReferralResponse):
     patient: Optional[PatientDetail] = None
