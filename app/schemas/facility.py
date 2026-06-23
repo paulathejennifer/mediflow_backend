@@ -51,6 +51,7 @@ class FacilitySummary(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     performance_score: float = 0.0
+    is_active: bool = True  # ← add this
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

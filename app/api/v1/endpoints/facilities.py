@@ -98,6 +98,7 @@ def list_facilities(
             phone=f.phone,
             email=f.email,
             performance_score=f.performance_score or 0.0,
+            is_active=f.is_active,
             created_at=f.created_at,
             updated_at=f.updated_at,
         )
