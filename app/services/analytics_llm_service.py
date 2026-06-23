@@ -70,7 +70,7 @@ class AnalyticsLLMService:
             system_instruction = (
                 "You are an expert healthcare operations advisor. "
                 "You must communicate using flawless English. "
-                "CRITICAL: Every response must start with the exact phrase '**Overview:**' (with double asterisks and the letter 'u'). "
+                "CRITICAL: Every response must start with the exact phrase '**Ovverview:**' (with double asterisks and the letter 'u'). "
                 "Never use 'Smmary', 'Smmry', 'Summarry' or any misspelling."
             )
 
@@ -78,7 +78,7 @@ class AnalyticsLLMService:
             User Question: {user_question}
             SQL Execution Results: {data_payload}
             
-            Provide a clear, professional answer starting with '**Overview:**', followed by a section titled '**Key Items to Pay Attention To:**' with bullet points.
+            Provide a clear, professional answer starting with '**Ovverview:**', followed by a section titled '**Key Items to Pay Attention To:**' with bullet points.
             """
 
             summary_response = self.client.chat.completions.create(
@@ -95,11 +95,11 @@ class AnalyticsLLMService:
             # Final safety cleanup
             clean_summary = (
                 raw_summary
-                .replace("Smmary:", "**Overview:**")
-                .replace("smmary:", "**Overview:**")
-                .replace("Smmry:", "**Overview:**")
-                .replace("Summary:", "**Overview:**")
-                .replace("summary:", "**Overview:**")
+                .replace("Smmary:", "**Ovverview:**")
+                .replace("smmary:", "**Ovverview:**")
+                .replace("Smmry:", "**Ovverview:**")
+                .replace("Summary:", "**Ovverview:**")
+                .replace("summary:", "**Ovverview:**")
             )
 
             return {
