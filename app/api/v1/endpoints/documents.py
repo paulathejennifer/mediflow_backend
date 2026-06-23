@@ -395,6 +395,7 @@ def delete_document(
 
 
 # ====================== PREVIEW & DOWNLOAD ======================
+# ====================== S3 PREVIEW & DOWNLOAD ======================
 
 @router.get("/{document_id}/view")
 def view_document(
@@ -402,22 +403,18 @@ def view_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Serve document for inline preview (iframe/image)"""
+    """Generate presigned URL for preview (iframe/image)"""
     doc = db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
     
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    
-    file_path = Path(doc.file_path)
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found on server")
 
-    # Return file with correct media type for preview
-    return FileResponse(
-        path=file_path,
-        filename=doc.file_name,
-        media_type="application/octet-stream"  # Let browser decide
-    )
+    try:
+        from app.utils.s3_storage import s3_storage
+        presigned_url = s3_storage.generate_presigned_url(doc.file_path, expires_in=3600)  # 1 hour
+        return {"url": presigned_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate preview URL: {str(e)}")
 
 
 @router.get("/{document_id}/download")
@@ -426,19 +423,15 @@ def download_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Force download with proper headers"""
+    """Generate presigned URL for download"""
     doc = db.query(ReferralDocument).filter(ReferralDocument.id == document_id).first()
     
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    
-    file_path = Path(doc.file_path)
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found on server")
 
-    return FileResponse(
-        path=file_path,
-        filename=doc.file_name,
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{doc.file_name}"'}
-    )
+    try:
+        from app.utils.s3_storage import s3_storage
+        presigned_url = s3_storage.generate_presigned_url(doc.file_path, expires_in=3600)
+        return {"url": presigned_url, "filename": doc.file_name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate download URL: {str(e)}")
