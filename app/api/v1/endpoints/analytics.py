@@ -160,7 +160,7 @@ def get_dashboard_kpis(
     """
     def calculate_trend(current: int, previous: int) -> float:
         if previous <= 0:
-            return 100.0 if current > 0 else 0.0
+            return 0.0
         return round(((current - previous) / previous) * 100, 1)
 
     try:
@@ -729,109 +729,81 @@ def get_top_referring_facilities(
         raise HTTPException(status_code=403, detail="Only super admin can view this analytics")
 
     try:
-        # Get referral counts per facility
-        facility_counts = (
-            db.query(
-                Referral.from_facility_id,
-                func.count(Referral.id).label("referral_count"),
-                func.sum(
-                    case(
-                        [(Referral.status == ReferralStatus.COMPLETED.value, 1)],
-                        else_=0
-                    )
-                ).label("completed_count"),
-                func.avg(
-                    case(
-                        [
-                            (
-                                and_(
-                                    Referral.status == ReferralStatus.COMPLETED.value,
-                                    Referral.updated_at.isnot(None),
-                                    Referral.created_at.isnot(None)
-                                ),
-                                extract(
-                                    'epoch',
-                                    Referral.updated_at - Referral.created_at
-                                ) / 86400
-                            )
-                        ],
-                        else_=None
-                    )
-                ).label("avg_turnaround")
-            )
-            .group_by(Referral.from_facility_id)
-            .order_by(func.count(Referral.id).desc())
-            .limit(limit)
-            .all()
-        )
-
+        # Get all facilities that have sent referrals
+        facilities = db.query(Facility).all()
+        
         result = []
-        for row in facility_counts:
-            facility = (
-                db.query(Facility)
-                .filter(Facility.id == row.from_facility_id)
-                .first()
-            )
-            if not facility:
+        for facility in facilities:
+            total = db.query(func.count(Referral.id)).filter(
+                Referral.from_facility_id == facility.id
+            ).scalar() or 0
+            
+            if total == 0:
                 continue
 
-            total = row.referral_count or 0
-            completed = row.completed_count or 0
-            avg_days = round(row.avg_turnaround or 0, 1)
+            completed = db.query(func.count(Referral.id)).filter(
+                Referral.from_facility_id == facility.id,
+                Referral.status == ReferralStatus.COMPLETED.value
+            ).scalar() or 0
+
             completion_rate = round((completed / max(total, 1)) * 100, 1)
 
-            # Simple trend: compare last 30 days vs previous 30 days
-            from datetime import datetime, timedelta
+            # Avg turnaround for completed referrals
+            completed_referrals = db.query(Referral).filter(
+                Referral.from_facility_id == facility.id,
+                Referral.status == ReferralStatus.COMPLETED.value,
+                Referral.completed_at.isnot(None),
+                Referral.submitted_at.isnot(None),
+            ).all()
 
+            if completed_referrals:
+                total_days = sum(
+                    (r.completed_at - r.submitted_at).total_seconds() / 86400
+                    for r in completed_referrals
+                    if r.completed_at and r.submitted_at
+                )
+                avg_days = round(total_days / max(len(completed_referrals), 1), 1)
+            else:
+                avg_days = 0.0
+
+            # Trend: last 30 days vs previous 30 days
             now = datetime.utcnow()
+            last_30 = db.query(func.count(Referral.id)).filter(
+                Referral.from_facility_id == facility.id,
+                Referral.created_at >= now - timedelta(days=30)
+            ).scalar() or 0
 
-            last_30 = (
-                db.query(func.count(Referral.id))
-                .filter(
-                    Referral.from_facility_id == row.from_facility_id,
-                    Referral.created_at >= now - timedelta(days=30),
-                )
-                .scalar()
-                or 0
-            )
-
-            prev_30 = (
-                db.query(func.count(Referral.id))
-                .filter(
-                    Referral.from_facility_id == row.from_facility_id,
-                    Referral.created_at >= now - timedelta(days=60),
-                    Referral.created_at < now - timedelta(days=30),
-                )
-                .scalar()
-                or 0
-            )
+            prev_30 = db.query(func.count(Referral.id)).filter(
+                Referral.from_facility_id == facility.id,
+                Referral.created_at >= now - timedelta(days=60),
+                Referral.created_at < now - timedelta(days=30)
+            ).scalar() or 0
 
             if prev_30 > 0:
                 trend_pct = round(((last_30 - prev_30) / prev_30) * 100, 1)
             else:
                 trend_pct = 0.0
 
-            result.append(
-                {
-                    "name": facility.name,
-                    "referrals": total,
-                    "avg_turnaround": f"{avg_days}d",
-                    "completion_rate": f"{completion_rate}%",
-                    "trend": {
-                        "value": f"{'+' if trend_pct >= 0 else ''}{trend_pct}%",
-                        "is_positive": trend_pct >= 0,
-                    },
+            result.append({
+                "name": facility.name,
+                "referrals": total,
+                "avg_turnaround": f"{avg_days}d",
+                "completion_rate": f"{completion_rate}%",
+                "trend": {
+                    "value": f"{'+' if trend_pct >= 0 else ''}{trend_pct}%",
+                    "is_positive": trend_pct >= 0
                 }
-            )
+            })
+
+        # Sort by referral count descending and limit
+        result.sort(key=lambda x: x["referrals"], reverse=True)
+        result = result[:limit]
 
         return {"data": result, "total": len(result)}
 
     except Exception as e:
         logger.error(f"Error in get_top_referring_facilities: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail="Error retrieving facility analytics",
-        )
+        raise HTTPException(status_code=500, detail=f"Error retrieving facility analytics: {str(e)}")
 
 @router.get("/system-activity")
 def get_system_activity_trend(
