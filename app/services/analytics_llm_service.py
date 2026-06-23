@@ -31,10 +31,10 @@ class AnalyticsLLMService:
     async def execute_natural_query(self, user_question: str) -> dict:
         """Translates user natural language questions to SQL, safely executes it, and formats the output."""
         schema = self._get_schema_context()
-        
+      
         sql_generation_prompt = f"""
         You are an expert SQL database administrator specialized in PostgreSQL. Based on the schema configuration provided below, generate an executable PostgreSQL select query to answer the user's question.
-        
+      
         Schema Context:
         {schema}
 
@@ -45,43 +45,40 @@ class AnalyticsLLMService:
         1. Return ONLY the raw SQL query code string. No explanations, no markdown blocks, no triple backticks.
         2. Make queries completely read-only. Do not use INSERT, UPDATE, DELETE, or DROP operations.
         3. Use table joins appropriately when referencing facility names or patient profiles.
-        4. CRITICAL: You are querying a PostgreSQL database. Do NOT use MySQL functions like CURDATE() or NOW(). Instead, use CURRENT_DATE for date filters (e.g., p.date_of_birth <= CURRENT_DATE).
+        4. CRITICAL: You are querying a PostgreSQL database. Do NOT use MySQL functions like CURDATE() or NOW(). Instead, use CURRENT_DATE for date filters.
 
         SQL Statement:
         """
 
         try:
-            # 1. Ask Llama to output a valid SQL string matching PostgreSQL dialect
+            # 1. Generate SQL
             sql_response = self.client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[{"role": "user", "content": sql_generation_prompt}],
-                temperature=0.0  # Kept at 0 for strict deterministic code generation
+                temperature=0.0
             )
             generated_sql = sql_response.choices[0].message.content.strip()
             logger.info(f"Generated Text-to-SQL Statement: {generated_sql}")
 
-            # 2. Execute SQL query directly against the active DB connection context securely
+            # 2. Execute SQL
             result_proxy = self.db.execute(text(generated_sql))
-            
-            # Map out database rows securely into key-value tuples
             rows = result_proxy.fetchall()
             keys = result_proxy.keys()
             data_payload = [dict(zip(keys, row)) for row in rows]
 
-            # 3. Separate guardrails into a System Persona to enforce strict compliance
+            # 3. Generate natural language response using "Overview" instead of "Summary"
             system_instruction = (
-    "You are an expert healthcare operations advisor. You must communicate using flawless English grammar. "
-    "CRITICAL: The FIRST word of your output must be exactly '**Summary:**' with double asterisks and the letter 'u'. "
-    "DO NOT write 'Smmary', 'Smmry', 'summary', or any misspelling. "
-    "If you accidentally misspell it, REWRITE it correctly as '**Summary:**' before sending your response."
+                "You are an expert healthcare operations advisor. "
+                "You must communicate using flawless English. "
+                "CRITICAL: Every response must start with the exact phrase '**Overview:**' (with double asterisks and the letter 'u'). "
+                "Never use 'Smmary', 'Smmry', 'Summarry' or any misspelling."
             )
 
             content_payload = f"""
             User Question: {user_question}
             SQL Execution Results: {data_payload}
             
-            Summarize the raw database analytical result sets provided above to answer the user's question clearly.
-            Provide a short, direct summary titled "**Summary:**", followed by a section titled "**Key Items to Pay Attention To:**", containing analytical observations as bullet points.
+            Provide a clear, professional answer starting with '**Overview:**', followed by a section titled '**Key Items to Pay Attention To:**' with bullet points.
             """
 
             summary_response = self.client.chat.completions.create(
@@ -90,18 +87,21 @@ class AnalyticsLLMService:
                     {"role": "system", "content": system_instruction},
                     {"role": "user", "content": content_payload}
                 ],
-                temperature=0.0  # Drop temperature to absolute 0 to stop spelling variations
+                temperature=0.0
             )
-            
+          
             raw_summary = summary_response.choices[0].message.content.strip()
-            
-            # Bulletproof cleanup pass against token-level model drop hallucinations
+          
+            # Final safety cleanup
             clean_summary = (
-                raw_summary.replace("Smmary:", "**Summary:**")
-                .replace("smmary:", "**summary:**")
-                .replace("Smmary", "Summary")
+                raw_summary
+                .replace("Smmary:", "**Overview:**")
+                .replace("smmary:", "**Overview:**")
+                .replace("Smmry:", "**Overview:**")
+                .replace("Summary:", "**Overview:**")
+                .replace("summary:", "**Overview:**")
             )
-            
+
             return {
                 "generated_sql": generated_sql,
                 "raw_data": data_payload,
@@ -113,5 +113,5 @@ class AnalyticsLLMService:
             return {
                 "generated_sql": "",
                 "raw_data": [],
-                "conversational_summary": f"Could not process query automatically. Error details: {str(e)}"
+                "conversational_summary": f"Could not process query automatically. Error: {str(e)}"
             }
