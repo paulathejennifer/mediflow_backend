@@ -1566,7 +1566,7 @@ async def backfill_referral_intelligence(
             await service.analyze_referral(referral.id)
             success += 1
         except Exception as e:
-            logger.error(f"Failed to process referral {referral.id}: {str(e)}")
+            logger.error(f"Failed referral {referral.id}: {str(e)}")
             failed += 1
     
     return {"success": success, "failed": failed, "total": len(referrals)}
