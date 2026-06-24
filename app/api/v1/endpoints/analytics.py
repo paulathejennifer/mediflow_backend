@@ -1493,7 +1493,8 @@ async def run_referral_ai_enrichment(referral_id: int, db: Session = Depends(get
     except ValueError as val_err:
         raise HTTPException(status_code=404, detail=str(val_err))
 
-  @router.get("/referrals/by-specialty")
+
+@router.get("/referrals/by-specialty")
 def get_referrals_by_specialty(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -1529,7 +1530,11 @@ def get_referrals_by_specialty(
 
             specialty_counts[specialty] = specialty_counts.get(specialty, 0) + 1
 
-        sorted_specialties = sorted(specialty_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        sorted_specialties = sorted(
+            specialty_counts.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:10]
 
         return {
             "labels": [item[0] for item in sorted_specialties],
