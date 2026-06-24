@@ -31,16 +31,18 @@ class ReferralIntelligenceService:
         """
 
         prompt = f"""
-        You are a highly experienced clinical data analysis assistant. Examine the unstructured clinical referral text provided below.
-        Extract specific categorizations to map out systemic routing. You must respond with raw, valid JSON only matching this exact schema:
+            You are a highly experienced clinical data analysis assistant. Examine the unstructured clinical referral text provided below.
+            Extract specific categorizations to map out systemic routing. You must respond with raw, valid JSON only matching this exact schema:
         {{
             "extracted_reason": "Brief unified categorization of the underlying condition or reason",
-            "specialty": "The target medical department or specialty required (e.g., Cardiology, Oncology, Neurology, Orthopedics, General Surgery)",
+            "specialty": "MUST be exactly one of these options: Cardiology, Endocrinology, Neurology, Orthopedics, Oncology, Pediatrics, Obstetrics & Gynecology, General Surgery, Ophthalmology, Dermatology, Psychiatry, Nephrology, Pulmonology, Gastroenterology, Urology, ENT, Hematology, Rheumatology, Infectious Disease, General Medicine",
             "urgency_score": "High", "Medium", or "Low" based on clinical presentation strings,
             "keywords": ["list", "of", "vital", "clinical", "terms", "symptoms", "or", "biopsies"]
         }}
-
-        Do not include any pleasantries, conversational fillers, or markdown codeblocks outside of raw JSON text.
+        Rules:
+        - The specialty field MUST be copied exactly from the list above, no variations, no abbreviations.
+        - If unsure, pick the closest match. If truly unrelated to any specialty, use General Medicine.
+        - Do not include any pleasantries, conversational fillers, or markdown codeblocks outside of raw JSON text.
 
         Clinical Referral Data:
         {source_text}
