@@ -1493,29 +1493,48 @@ async def run_referral_ai_enrichment(referral_id: int, db: Session = Depends(get
     except ValueError as val_err:
         raise HTTPException(status_code=404, detail=str(val_err))
 
-@router.get("/referrals/by-specialty")
-def get_referrals_by_specialty(db: Session = Depends(get_db)):
-    """Return referrals grouped by AI-extracted medical specialty (PostgreSQL compatible)."""
+  @router.get("/referrals/by-specialty")
+def get_referrals_by_specialty(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
-        result = db.execute(
-            text("""
-                SELECT 
-                    COALESCE(
-                        (ai_summary->'v2_intelligence'->>'specialty')::text, 
-                        'Unclassified'
-                    ) as specialty,
-                    COUNT(id) as count
-                FROM referrals 
-                WHERE ai_summary IS NOT NULL 
-                GROUP BY specialty
-                ORDER BY count DESC
-            """)
-        ).all()
+        import json
 
-        labels = [row.specialty for row in result]
-        counts = [row.count for row in result]
+        referrals = db.query(Referral).all()  # ← all referrals, not just those with ai_summary
 
-        return {"labels": labels, "data": counts}
+        specialty_counts = {}
+        for referral in referrals:
+            specialty = None
+
+            # Try to get from AI summary first
+            if referral.ai_summary:
+                try:
+                    data = json.loads(referral.ai_summary)
+                    if "v2_intelligence" in data:
+                        specialty = data["v2_intelligence"].get("specialty")
+                    else:
+                        specialty = data.get("specialty")
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
+            # Fall back to reason_for_referral as the label
+            if not specialty and referral.reason_for_referral:
+                # Truncate long reasons to use as category
+                reason = referral.reason_for_referral.strip()
+                specialty = reason[:50] + "..." if len(reason) > 50 else reason
+
+            if not specialty:
+                specialty = "Unclassified"
+
+            specialty_counts[specialty] = specialty_counts.get(specialty, 0) + 1
+
+        sorted_specialties = sorted(specialty_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+        return {
+            "labels": [item[0] for item in sorted_specialties],
+            "data": [item[1] for item in sorted_specialties]
+        }
 
     except Exception as e:
         logger.error(f"Error in referrals by specialty: {str(e)}")
