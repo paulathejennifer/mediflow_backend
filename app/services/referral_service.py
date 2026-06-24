@@ -7,7 +7,7 @@ This service handles referral-related business logic including:
 - AI summarization integration
 - Referral analytics
 """
-
+import json
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 from fastapi import HTTPException, status
