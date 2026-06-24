@@ -1544,3 +1544,29 @@ def get_referrals_by_specialty(
     except Exception as e:
         logger.error(f"Error in referrals by specialty: {str(e)}")
         return {"labels": [], "data": []}
+
+
+@router.post("/referrals/backfill-intelligence")
+async def backfill_referral_intelligence(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """One-time backfill to run AI intelligence on all existing referrals."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Super admin only")
+    
+    from app.services.referral_intelligence_service import ReferralIntelligenceService
+    
+    referrals = db.query(Referral).all()
+    service = ReferralIntelligenceService(db)
+    
+    success, failed = 0, 0
+    for referral in referrals:
+        try:
+            await service.analyze_referral(referral.id)
+            success += 1
+        except Exception as e:
+            logger.error(f"Failed to process referral {referral.id}: {str(e)}")
+            failed += 1
+    
+    return {"success": success, "failed": failed, "total": len(referrals)}

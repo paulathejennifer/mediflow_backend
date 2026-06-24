@@ -30,14 +30,19 @@ async def create_referral(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+
     permission_checker = get_permission_checker(current_user, db)
     if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.FACILITY_ADMIN, UserRole.CLINICIAN]:
         raise HTTPException(status_code=403, detail="Permission denied")
-    
+
     if not current_user.facility_id and current_user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(status_code=400, detail="User must be assigned to a facility")
+
     if not current_user.facility_id and current_user.role == UserRole.SUPER_ADMIN:
-        raise HTTPException(status_code=400, detail="Super Admin must select a source facility (not yet implemented in UI)")
+        raise HTTPException(
+            status_code=400,
+            detail="Super Admin must select a source facility (not yet implemented in UI)"
+        )
 
     referral = Referral(
         patient_id=referral_data.patient_id,
@@ -49,9 +54,23 @@ async def create_referral(
         clinical_notes=referral_data.clinical_notes,
         status=ReferralStatus.DRAFT,
     )
+
     db.add(referral)
     db.commit()
     db.refresh(referral)
+
+    # Auto-run AI intelligence in background
+    try:
+        from app.services.referral_intelligence_service import ReferralIntelligenceService
+        import asyncio
+
+        service = ReferralIntelligenceService(db)
+        asyncio.create_task(service.analyze_referral(referral.id))
+    except Exception as e:
+        print(
+            f"Non-critical: AI intelligence failed for referral {referral.id}: {str(e)}"
+        )
+
     return referral
 
 @router.get("", response_model=List[ReferralSummary])
