@@ -1502,38 +1502,45 @@ def get_referrals_by_specialty(
     try:
         import json
 
-        referrals = db.query(Referral).all()  # ← all referrals, not just those with ai_summary
+        referrals = db.query(Referral).all()
 
         specialty_counts = {}
         for referral in referrals:
             specialty = None
 
-            # Try to get from AI summary first
             if referral.ai_summary:
                 try:
                     data = json.loads(referral.ai_summary)
-                    if "v2_intelligence" in data:
-                        specialty = data["v2_intelligence"].get("specialty")
+                    
+                    # Handle v2_intelligence wrapper format
+                    if isinstance(data, dict) and "v2_intelligence" in data:
+                        raw = data["v2_intelligence"].get("specialty")
+                    elif isinstance(data, dict):
+                        raw = data.get("specialty")
                     else:
-                        specialty = data.get("specialty")
-                except (json.JSONDecodeError, AttributeError):
+                        raw = None
+
+                    # Only use it if it's actually a string
+                    if isinstance(raw, str) and raw.strip():
+                        specialty = raw.strip()
+
+                except (json.JSONDecodeError, AttributeError, TypeError):
                     pass
 
-            # Fall back to reason_for_referral as the label
+            # Fallback to truncated reason
             if not specialty and referral.reason_for_referral:
-                # Truncate long reasons to use as category
                 reason = referral.reason_for_referral.strip()
-                specialty = reason[:50] + "..." if len(reason) > 50 else reason
+                specialty = reason[:40] + "..." if len(reason) > 40 else reason
 
             if not specialty:
                 specialty = "Unclassified"
 
+            # Ensure specialty is always a string before using as dict key
+            specialty = str(specialty)
             specialty_counts[specialty] = specialty_counts.get(specialty, 0) + 1
 
         sorted_specialties = sorted(
-            specialty_counts.items(),
-            key=lambda x: x[1],
-            reverse=True
+            specialty_counts.items(), key=lambda x: x[1], reverse=True
         )[:10]
 
         return {
