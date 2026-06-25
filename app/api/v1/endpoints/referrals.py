@@ -30,7 +30,6 @@ async def create_referral(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-
     permission_checker = get_permission_checker(current_user, db)
     if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.FACILITY_ADMIN, UserRole.CLINICIAN]:
         raise HTTPException(status_code=403, detail="Permission denied")
@@ -59,17 +58,28 @@ async def create_referral(
     db.commit()
     db.refresh(referral)
 
-    # Auto-run AI intelligence in background
+    # Auto-run AI intelligence in background using a fresh DB session
     try:
         from app.services.referral_intelligence_service import ReferralIntelligenceService
         import asyncio
 
-        service = ReferralIntelligenceService(db)
-        asyncio.create_task(service.analyze_referral(referral.id))
+        referral_id = referral.id  # capture before any session issues
+
+        async def run_intelligence():
+            from app.core.database import SessionLocal
+            async_db = SessionLocal()
+            try:
+                svc = ReferralIntelligenceService(async_db)
+                await svc.analyze_referral(referral_id)
+            except Exception as inner_e:
+                print(f"Non-critical: AI intelligence inner error for referral {referral_id}: {str(inner_e)}")
+            finally:
+                async_db.close()
+
+        asyncio.ensure_future(run_intelligence())
+
     except Exception as e:
-        print(
-            f"Non-critical: AI intelligence failed for referral {referral.id}: {str(e)}"
-        )
+        print(f"Non-critical: AI intelligence failed for referral {referral.id}: {str(e)}")
 
     return referral
 

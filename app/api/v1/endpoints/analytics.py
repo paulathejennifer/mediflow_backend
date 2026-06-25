@@ -1499,45 +1499,40 @@ def get_referrals_by_specialty(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    VALID_SPECIALTIES = {
+        "Cardiology", "Endocrinology", "Neurology", "Orthopedics", "Oncology",
+        "Pediatrics", "Obstetrics & Gynecology", "General Surgery", "Ophthalmology",
+        "Dermatology", "Psychiatry", "Nephrology", "Pulmonology", "Gastroenterology",
+        "Urology", "ENT", "Hematology", "Rheumatology", "Infectious Disease",
+        "General Medicine"
+    }
+
     try:
         import json
-
-        referrals = db.query(Referral).all()
+        referrals = db.query(Referral).filter(Referral.ai_summary.isnot(None)).all()
 
         specialty_counts = {}
         for referral in referrals:
             specialty = None
+            try:
+                data = json.loads(referral.ai_summary)
+                if isinstance(data, dict) and "v2_intelligence" in data:
+                    raw = data["v2_intelligence"].get("specialty")
+                elif isinstance(data, dict):
+                    raw = data.get("specialty")
+                else:
+                    raw = None
 
-            if referral.ai_summary:
-                try:
-                    data = json.loads(referral.ai_summary)
-                    
-                    # Handle v2_intelligence wrapper format
-                    if isinstance(data, dict) and "v2_intelligence" in data:
-                        raw = data["v2_intelligence"].get("specialty")
-                    elif isinstance(data, dict):
-                        raw = data.get("specialty")
-                    else:
-                        raw = None
+                if isinstance(raw, str) and raw.strip() in VALID_SPECIALTIES:
+                    specialty = raw.strip()
 
-                    # Only use it if it's actually a string
-                    if isinstance(raw, str) and raw.strip():
-                        specialty = raw.strip()
+            except (json.JSONDecodeError, AttributeError, TypeError):
+                pass
 
-                except (json.JSONDecodeError, AttributeError, TypeError):
-                    pass
-
-            # Fallback to truncated reason
-            if not specialty and referral.reason_for_referral:
-                reason = referral.reason_for_referral.strip()
-                specialty = reason[:40] + "..." if len(reason) > 40 else reason
-
-            if not specialty:
-                specialty = "Unclassified"
-
-            # Ensure specialty is always a string before using as dict key
-            specialty = str(specialty)
-            specialty_counts[specialty] = specialty_counts.get(specialty, 0) + 1
+            # Only count referrals with valid AI-classified specialties
+            # No fallback — unprocessed referrals are simply excluded
+            if specialty:
+                specialty_counts[specialty] = specialty_counts.get(specialty, 0) + 1
 
         sorted_specialties = sorted(
             specialty_counts.items(), key=lambda x: x[1], reverse=True
@@ -1551,7 +1546,6 @@ def get_referrals_by_specialty(
     except Exception as e:
         logger.error(f"Error in referrals by specialty: {str(e)}")
         return {"labels": [], "data": []}
-
 
 @router.post("/referrals/backfill-intelligence")
 async def backfill_referral_intelligence(
